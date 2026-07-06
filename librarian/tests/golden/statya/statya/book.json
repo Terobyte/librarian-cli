@@ -1,0 +1,32 @@
+{
+  "author": "",
+  "chapters": [
+    {
+      "file": "chapters/001-vvedenie.md",
+      "n": 1,
+      "summary": "Работа завершена, выводы сделаны, планы намечены на будущее. — Начало · Метод · Результаты · Заключение",
+      "title": "Введение",
+      "tokens": 111
+    }
+  ],
+  "id": "statya",
+  "lang": "ru",
+  "meta_locked": false,
+  "provenance": {
+    "cache_key": "cb7756d184edd000e4892ee7e4bfcf22916cc605526fe882046290857cc95a32:2.2:1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "config_hash": "1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "ingested_at": "1970-01-01T00:00:00Z",
+    "pipeline_version": "2.2"
+  },
+  "quality": {
+    "score": 0.925,
+    "status": "ok"
+  },
+  "source": {
+    "file": "statya.md",
+    "format": "md",
+    "sha256": "cb7756d184edd000e4892ee7e4bfcf22916cc605526fe882046290857cc95a32"
+  },
+  "title": "statya",
+  "total_tokens": 111
+}

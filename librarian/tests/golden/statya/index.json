@@ -1,0 +1,13 @@
+{
+  "books": [
+    {
+      "author": "",
+      "chapters": 1,
+      "id": "statya",
+      "status": "ok",
+      "title": "statya",
+      "total_tokens": 111
+    }
+  ],
+  "pipeline_version": "2.2"
+}

@@ -1,0 +1,13 @@
+{
+  "books": [
+    {
+      "author": "",
+      "chapters": 2,
+      "id": "koi8",
+      "status": "ok",
+      "title": "koi8",
+      "total_tokens": 225
+    }
+  ],
+  "pipeline_version": "2.2"
+}

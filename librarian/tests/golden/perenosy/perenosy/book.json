@@ -1,0 +1,32 @@
+{
+  "author": "",
+  "chapters": [
+    {
+      "file": "chapters/001-nachalo.md",
+      "n": 1,
+      "summary": "Проверка склейки переносов в обычном тексте про науку и жизнь.",
+      "title": "Начало",
+      "tokens": 59
+    }
+  ],
+  "id": "perenosy",
+  "lang": "ru",
+  "meta_locked": false,
+  "provenance": {
+    "cache_key": "aaa8da4015ab164f5b430bc74805aa83c20edbc2c7fdd8da526c70d481ee4d8e:2.2:1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "config_hash": "1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "ingested_at": "1970-01-01T00:00:00Z",
+    "pipeline_version": "2.2"
+  },
+  "quality": {
+    "score": 0.825,
+    "status": "review"
+  },
+  "source": {
+    "file": "perenosy.txt",
+    "format": "txt",
+    "sha256": "aaa8da4015ab164f5b430bc74805aa83c20edbc2c7fdd8da526c70d481ee4d8e"
+  },
+  "title": "perenosy",
+  "total_tokens": 59
+}

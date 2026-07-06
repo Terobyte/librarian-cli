@@ -1,0 +1,13 @@
+{
+  "books": [
+    {
+      "author": "",
+      "chapters": 1,
+      "id": "perenosy",
+      "status": "review",
+      "title": "perenosy",
+      "total_tokens": 59
+    }
+  ],
+  "pipeline_version": "2.2"
+}

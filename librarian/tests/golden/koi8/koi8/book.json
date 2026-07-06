@@ -1,0 +1,39 @@
+{
+  "author": "",
+  "chapters": [
+    {
+      "file": "chapters/001-tom-pervyy.md",
+      "n": 1,
+      "summary": "Инженер Пётр Семёнович проснулся рано утром и долго смотрел в окно на заводскую трубу. Мысли его были тяжелы: проект горел, сроки поджимали, а вдохновение не приходило. — Начало · Глава 1 · Глава 2",
+      "title": "Том первый",
+      "tokens": 123
+    },
+    {
+      "file": "chapters/002-tom-vtoroy.md",
+      "n": 2,
+      "summary": "Новая жизнь началась с малого: он купил билет на поезд до южного города. В вагоне пахло углём и свободой, колёса стучали ободряюще и ровно. — Глава 1 · Глава 2",
+      "title": "Том второй",
+      "tokens": 102
+    }
+  ],
+  "id": "koi8",
+  "lang": "ru",
+  "meta_locked": false,
+  "provenance": {
+    "cache_key": "8abe3f40ee9052d4aa0d2c09cd6b132bfb4eb890cb5eee42cadd4faa1ad19fb9:2.2:1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "config_hash": "1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "ingested_at": "1970-01-01T00:00:00Z",
+    "pipeline_version": "2.2"
+  },
+  "quality": {
+    "score": 0.925,
+    "status": "ok"
+  },
+  "source": {
+    "file": "koi8.txt",
+    "format": "txt",
+    "sha256": "8abe3f40ee9052d4aa0d2c09cd6b132bfb4eb890cb5eee42cadd4faa1ad19fb9"
+  },
+  "title": "koi8",
+  "total_tokens": 225
+}
