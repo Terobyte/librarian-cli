@@ -12,7 +12,7 @@ from librarian.config import Config, config_hash
 from librarian.detect import detect
 from librarian.emit import (emit_book, lang_heuristic, library_lock,
                             recover, render_chapter)
-from librarian.errors import DetectError, LibError
+from librarian.errors import DetectError, LibError, LimitError
 from librarian.extractors.base import get_extractor
 from librarian.ir import BlockKind, BookMeta, DocContext, ReportDraft
 from librarian.passes.normalize import apply_block_passes
@@ -58,6 +58,10 @@ def _safe_ingest(path: Path, cfg: Config, lib_root: Path, force: bool) -> Ingest
 
 def ingest_file(path: Path, cfg: Config, lib_root: Path,
                 force: bool = False) -> IngestOutcome:
+    size = path.stat().st_size                                           # 0 — лимит §6.0
+    if size > cfg.limits.max_source_mb * 1024 * 1024:
+        raise LimitError(f"{path.name}: файл {size // (1024 * 1024)} МБ "
+                         f"больше лимита {cfg.limits.max_source_mb} МБ")
     fmt = detect(path)                                                   # 1
     sha = hashlib.sha256(path.read_bytes()).hexdigest()                  # 2
     chash = config_hash(cfg)

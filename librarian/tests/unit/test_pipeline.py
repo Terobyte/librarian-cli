@@ -1,5 +1,6 @@
+import dataclasses
 import json
-from librarian.config import Config
+from librarian.config import Config, LimitsCfg, load_config
 from librarian.pipeline import run_ingest
 
 BOOK = """Глава 1
@@ -72,3 +73,13 @@ def test_fallback_review(tmp_path, monkeypatch):
     p = _write(tmp_path, "плоский.txt", "Просто длинный текст без заголовков. " * 40)
     out = run_ingest([p], Config(), tmp_path / "library")
     assert out[0].status == "review"
+
+
+def test_source_size_limit(tmp_path):
+    src = tmp_path / "big.txt"
+    src.write_text("Глава 1\n\nТекст главы про лимиты.\n", encoding="utf-8")
+    cfg = dataclasses.replace(load_config(None), limits=LimitsCfg(max_source_mb=0))
+    outcomes = run_ingest([src], cfg, tmp_path / "lib")
+    assert outcomes[0].status == "failed"
+    assert "больше лимита" in outcomes[0].message
+    assert not (tmp_path / "lib" / "big").exists()
