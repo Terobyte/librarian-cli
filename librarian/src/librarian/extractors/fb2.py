@@ -40,6 +40,40 @@ def _quote_text(el) -> str:
     return "\n".join(parts)
 
 
+def _inline_note_markers(body) -> None:
+    """<a type="note">1</a> → текст «[1]» на месте ссылки (§6.3)."""
+    for a in list(body.iter()):
+        if _local(a) != "a" or (a.get("type") or "").casefold() != "note":
+            continue
+        txt = "".join(a.itertext()).strip()
+        if txt and not txt.startswith("["):
+            txt = f"[{txt}]"
+        addition = txt + (a.tail or "")
+        prev, parent = a.getprevious(), a.getparent()
+        if prev is not None:
+            prev.tail = (prev.tail or "") + addition
+        else:
+            parent.text = (parent.text or "") + addition
+        parent.remove(a)
+
+
+def _notes_blocks(extra_bodies) -> list[Block]:
+    """Секции всех неосновных body → пары «номер — текст» (§6.3)."""
+    out: list[Block] = []
+    for body in extra_bodies:
+        for sec in body.iter():
+            if _local(sec) != "section":
+                continue
+            paras = [t for el in sec if _local(el) == "p" and (t := _flat(el))]
+            if not paras:
+                continue                      # контейнерная секция без текста
+            title = _child(sec, "title")
+            num = _title_text(title).rstrip(".") if title is not None else ""
+            text = " ".join(paras)
+            out.append(Block(BlockKind.PARA, f"{num}. {text}" if num else text))
+    return out
+
+
 def _walk_section(sec, depth: int, blocks: list[Block]) -> None:
     for el in sec:
         tag = _local(el)
@@ -114,8 +148,15 @@ class Fb2Extractor:
             raise BrokenFileError(f"{path.name}: в FB2 нет <body>")
         ref = "\n".join("".join(b.itertext()) for b in bodies)      # §11.1, до мутаций
         main = next((b for b in bodies if not b.get("name")), bodies[0])
+        extra = [b for b in bodies if b is not main]
+        _inline_note_markers(main)
         blocks: list[Block] = []
         _walk_section(main, 0, blocks)
+        notes = _notes_blocks(extra)
+        if notes:
+            blocks.append(Block(BlockKind.HEADING, cfg.general.notes_chapter_title,
+                                level=1, origin="fb2-notes"))
+            blocks.extend(notes)
         title, author, lang = _metadata(root)
         return RawDoc(fmt=Format.FB2, blocks=blocks, title=title, author=author,
                       lang=lang, ref_text=ref)

@@ -94,3 +94,41 @@ def test_registered():
     from librarian.extractors.base import get_extractor
     from librarian.ir import Format
     assert type(get_extractor(Format.FB2)).__name__ == "Fb2Extractor"
+
+
+_NOTES = """<body>
+  <section><title><p>Глава 1</p></title>
+    <p>Кит<a l:href="#n1" type="note">1</a> плыл на юг.</p>
+    <p>Ссылка<a l:href="#n2" type="note">[2]</a> уже в скобках.</p>
+  </section></body>
+<body name="notes">
+  <section id="n1"><title><p>1</p></title><p>Кит — морское млекопитающее.</p></section>
+  <section id="n2"><title><p>2</p></title><p>Вторая сноска.</p></section>
+</body>"""
+
+
+def test_inline_note_markers(tmp_path):
+    raw = _extract(tmp_path, _NOTES)
+    paras = [b.text for b in raw.blocks if b.kind is BlockKind.PARA]
+    assert "Кит[1] плыл на юг." in paras
+    assert "Ссылка[2] уже в скобках." in paras        # скобки не задвоены
+
+
+def test_notes_chapter_appended(tmp_path):
+    raw = _extract(tmp_path, _NOTES)
+    heads = [b for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert heads[-1].text == "Примечания" and heads[-1].level == 1
+    tail = [b.text for b in raw.blocks[raw.blocks.index(heads[-1]) + 1:]]
+    assert tail == ["1. Кит — морское млекопитающее.", "2. Вторая сноска."]
+
+
+def test_notes_body_not_in_main_flow(tmp_path):
+    raw = _extract(tmp_path, _NOTES)
+    idx_notes = next(i for i, b in enumerate(raw.blocks) if b.text == "Примечания")
+    main = " ".join(b.text for b in raw.blocks[:idx_notes])
+    assert "морское млекопитающее" not in main
+
+
+def test_no_notes_no_synthetic_chapter(tmp_path):
+    raw = _extract(tmp_path, "<body><section><p>Текст.</p></section></body>")
+    assert all(b.text != "Примечания" for b in raw.blocks)
