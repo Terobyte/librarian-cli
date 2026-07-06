@@ -1,0 +1,13 @@
+{
+  "books": [
+    {
+      "author": "Пелагея Морская",
+      "chapters": 2,
+      "id": "pelageya-morskaya-bezgolovaya-kniga",
+      "status": "ok",
+      "title": "Безголовая книга",
+      "total_tokens": 2320
+    }
+  ],
+  "pipeline_version": "2.2"
+}

@@ -72,4 +72,85 @@ print("hello")
 (FIX / "txt" / "koi8.txt").write_bytes(ROMAN.encode("koi8-r"))
 (FIX / "txt" / "perenosy.txt").write_bytes(PERENOSY.encode("utf-8"))
 (FIX / "md" / "statya.md").write_bytes(STATYA.encode("utf-8"))
+
+# --- M2: fb2 / epub ---------------------------------------------------------
+import zipfile
+
+FB2_DIR = FIX / "fb2"
+EPUB_DIR = FIX / "epub"
+FB2_DIR.mkdir(parents=True, exist_ok=True)
+EPUB_DIR.mkdir(parents=True, exist_ok=True)
+
+_PARA = ("Кит шёл на юг, раздвигая тяжёлую воду, и берег медленно таял за "
+         "кормой рыбацких лодок. ") * 12                 # ~150 токенов на абзац
+
+SKAZKA = """<?xml version="1.0" encoding="utf-8"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0"
+             xmlns:l="http://www.w3.org/1999/xlink">
+<description><title-info>
+  <author><first-name>Иван</first-name><last-name>Хвостов</last-name></author>
+  <book-title>Сказка о ките</book-title>
+  <lang>ru</lang>
+</title-info></description>
+<body>
+  <title><p>Сказка о ките</p></title>
+  <section><title><p>Часть первая</p></title>
+    <epigraph><p>Море зовёт всякого.</p><text-author>Н. Волнов</text-author></epigraph>
+    <section><title><p>Глава 1</p></title>
+      <p>Жил-был кит<a l:href="#n1" type="note">1</a>. {p}</p>
+      <subtitle>* * *</subtitle>
+      <p>{p}</p>
+      <poem><stanza><v>Волна идёт,</v><v>волна поёт,</v></stanza>
+            <stanza><v>а кит молчит и ждёт.</v></stanza></poem>
+    </section>
+    <section><title><p>Глава 2</p></title>
+      <p>{p}</p>
+      <cite><p>Так говорили старики на берегу.</p></cite>
+      <p>{p}</p>
+    </section>
+  </section>
+</body>
+<body name="notes">
+  <section id="n1"><title><p>1</p></title>
+    <p>Кит — самое большое морское млекопитающее.</p></section>
+</body>
+<binary id="cover.png" content-type="image/png">aWdub3JlZA==</binary>
+</FictionBook>""".format(p=_PARA.strip())
+
+(FB2_DIR / "skazka.fb2").write_text(SKAZKA, encoding="utf-8", newline="\n")
+
+ARHIV_FB2 = SKAZKA.replace("Сказка о ките", "Сказка из архива")
+
+
+def zip_write(zf, name, data, compress=zipfile.ZIP_DEFLATED):
+    zi = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))   # детерминизм
+    zi.compress_type = compress
+    zi.external_attr = 0o644 << 16
+    zf.writestr(zi, data)
+
+
+with zipfile.ZipFile(FB2_DIR / "arhiv.zip", "w") as z:
+    zip_write(z, "kniga.fb2", ARHIV_FB2.encode("utf-8"))
+
+# EPUB — переиспользуем билдер из юнит-теста
+import sys
+sys.path.insert(0, str(FIX.parent))                       # FIX.parent == .../tests
+from unit.test_epub import make_epub                     # noqa: E402
+
+_CH = ("<p>" + _PARA.strip() + "</p>") * 3
+
+make_epub(EPUB_DIR / "povest.epub", "Повесть о шторме",
+          chapters=[("ch1.xhtml", "<h1>Глава 1</h1>" + _CH +
+                     "<blockquote><p>Цитата о море.</p></blockquote>"),
+                    ("ch2.xhtml", "<h1>Глава 2</h1>" + _CH +
+                     "<ul><li>сеть</li><li>парус</li></ul>")],
+          nav_links=[("ch1.xhtml", "Глава 1"), ("ch2.xhtml", "Глава 2")],
+          ident="povest")
+
+make_epub(EPUB_DIR / "bezgolov.epub", "Безголовая книга",
+          chapters=[("text1.xhtml", _CH), ("text2.xhtml", _CH)],
+          nav_links=[("text1.xhtml#start", "Пролог"), ("text2.xhtml", "Эпилог")],
+          ident="bezgolov")
+
 print("fixtures written")
+print("fb2/epub fixtures written")

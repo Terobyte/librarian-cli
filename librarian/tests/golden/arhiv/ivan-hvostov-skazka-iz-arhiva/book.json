@@ -1,0 +1,32 @@
+{
+  "author": "Иван Хвостов",
+  "chapters": [
+    {
+      "file": "chapters/001-chast-pervaya.md",
+      "n": 1,
+      "summary": "Жил-был кит[1]. Кит шёл на юг, раздвигая тяжёлую воду, и берег медленно таял за кормой рыбацких лодок. Кит шёл на юг, раздвигая тяжёлую воду, и берег медленно таял за кормой рыбацких лодок. Кит шёл на юг, раздвигая тяжёлую воду, и берег медленно таял за кормой рыбацких лодок. Кит шёл на юг,… — Глава 1 · * * * · Глава 2 · Примечания",
+      "title": "Часть первая",
+      "tokens": 1630
+    }
+  ],
+  "id": "ivan-hvostov-skazka-iz-arhiva",
+  "lang": "ru",
+  "meta_locked": false,
+  "provenance": {
+    "cache_key": "74b98162002e5b2e7f12e7d00ab0b7057a3d92c22fdaabfdaf121f6652b7362d:2.2:1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "config_hash": "1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "ingested_at": "1970-01-01T00:00:00Z",
+    "pipeline_version": "2.2"
+  },
+  "quality": {
+    "score": 1.0,
+    "status": "ok"
+  },
+  "source": {
+    "file": "arhiv.zip",
+    "format": "fb2",
+    "sha256": "74b98162002e5b2e7f12e7d00ab0b7057a3d92c22fdaabfdaf121f6652b7362d"
+  },
+  "title": "Сказка из архива",
+  "total_tokens": 1630
+}

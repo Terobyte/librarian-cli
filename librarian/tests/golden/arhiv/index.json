@@ -1,0 +1,13 @@
+{
+  "books": [
+    {
+      "author": "Иван Хвостов",
+      "chapters": 1,
+      "id": "ivan-hvostov-skazka-iz-arhiva",
+      "status": "ok",
+      "title": "Сказка из архива",
+      "total_tokens": 1630
+    }
+  ],
+  "pipeline_version": "2.2"
+}

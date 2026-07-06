@@ -1,0 +1,13 @@
+{
+  "books": [
+    {
+      "author": "Иван Хвостов",
+      "chapters": 1,
+      "id": "ivan-hvostov-skazka-o-kite",
+      "status": "ok",
+      "title": "Сказка о ките",
+      "total_tokens": 1630
+    }
+  ],
+  "pipeline_version": "2.2"
+}

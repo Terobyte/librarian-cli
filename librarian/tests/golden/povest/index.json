@@ -1,0 +1,13 @@
+{
+  "books": [
+    {
+      "author": "Пелагея Морская",
+      "chapters": 2,
+      "id": "pelageya-morskaya-povest-o-shtorme",
+      "status": "ok",
+      "title": "Повесть о шторме",
+      "total_tokens": 2336
+    }
+  ],
+  "pipeline_version": "2.2"
+}

@@ -1,0 +1,22 @@
+{
+  "config_hash": "1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+  "control_chars": 0,
+  "hard_triggers": [],
+  "metrics": {
+    "median_tokens": 1160.0,
+    "structure": 1.0
+  },
+  "oversize_blocks_split": 0,
+  "pipeline_version": "2.2",
+  "removed": {},
+  "score": 1.0,
+  "status": "ok",
+  "subscores": {
+    "coverage": 1.0,
+    "dehyphen": 1.0,
+    "encoding": 1.0,
+    "garbage": 1.0,
+    "structure": 1.0
+  },
+  "warnings": []
+}
