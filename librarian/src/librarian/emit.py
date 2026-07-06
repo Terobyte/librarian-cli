@@ -1,12 +1,25 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
+import sys
+import time
 import unicodedata
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
 
 from librarian.config import Config
+from librarian.errors import LibError
 from librarian.ir import Block, BlockKind, Chapter
 from librarian.slug import slugify
+
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
 
 _PART_SUFFIX = re.compile(r"\s*\(\d+/\d+\)$")
 
@@ -74,3 +87,68 @@ def render_chapter(ch: Chapter) -> str:
     text = "\n\n".join(body)
     text = "\n".join(ln.rstrip() for ln in text.split("\n"))
     return unicodedata.normalize("NFC", text).rstrip("\n") + "\n"
+
+
+def ingested_at() -> str:
+    sde = os.environ.get("SOURCE_DATE_EPOCH")
+    ts = int(sde) if sde else int(time.time())
+    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+@contextmanager
+def library_lock(lib_root: Path, timeout_s: float):
+    lib_root.mkdir(parents=True, exist_ok=True)
+    f = open(lib_root / ".lock", "a+b")
+    deadline = time.monotonic() + timeout_s
+    try:
+        while True:
+            try:
+                if os.name == "nt":
+                    f.seek(0)
+                    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise LibError("библиотека занята другим процессом") from None
+                time.sleep(0.1)
+        yield
+    finally:
+        try:
+            if os.name == "nt":
+                f.seek(0)
+                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(f, fcntl.LOCK_UN)
+        except OSError:
+            pass
+        f.close()
+
+
+def recover(lib_root: Path) -> None:
+    trash, staging = lib_root / ".trash", lib_root / ".staging"
+    if trash.is_dir():
+        for d in sorted(p for p in trash.iterdir() if p.is_dir()):
+            target = lib_root / d.name
+            if not target.exists():
+                os.replace(d, target)
+                print(f"восстановлена книга {d.name} после прерванной записи",
+                      file=sys.stderr)
+    if staging.exists():
+        shutil.rmtree(staging)
+    if trash.exists():
+        shutil.rmtree(trash)
+
+
+def publish(staging_dir: Path, lib_root: Path, book_id: str) -> Path:
+    target = lib_root / book_id
+    trash = lib_root / ".trash" / book_id
+    if target.exists():
+        trash.parent.mkdir(exist_ok=True)
+        if trash.exists():
+            shutil.rmtree(trash)
+        os.replace(target, trash)
+    os.replace(staging_dir, target)
+    shutil.rmtree(lib_root / ".trash", ignore_errors=True)
+    return target
