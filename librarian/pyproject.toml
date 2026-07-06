@@ -1,0 +1,26 @@
+[project]
+name = "librarian"
+version = "0.1.0"
+description = "Deterministic book-to-markdown pipeline for LLM consumption"
+requires-python = ">=3.11"
+dependencies = [
+    "pymupdf>=1.24", "ebooklib>=0.18", "lxml>=5.0", "mammoth>=1.7",
+    "trafilatura>=1.9", "charset-normalizer>=3.3", "tiktoken>=0.7",
+    "typer>=0.12", "rich>=13",
+]
+
+[project.scripts]
+lib = "librarian.cli:app"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/librarian"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
