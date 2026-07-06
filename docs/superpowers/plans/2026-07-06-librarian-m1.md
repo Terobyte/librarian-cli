@@ -3415,6 +3415,7 @@ def test_wheel_smoke():
 10. **structure.py тесты (модуль — дословно из плана, правки только в фикстурах):**
     - `test_choose_level_deepens`: в лямбде плану стоит `... is False else 100`, но `_segments(root,2)` через `collect_deep` инжектит level-3 заголовки в сегменты уровня 2, поэтому `any(level==3) is False` ложно → 100 → углубления нет → `choose_cut_level` возвращает 1, а не 3. Реализация инвертировала полярность (`... else 100`, т.е. 20000 когда level-3 есть) — это и есть интент NOTE («L=2 большие, L=3 маленькие»).
     - `test_fallback_parts`: `"слово "*400` даёт ~402 токена/блок (всего 4020 < `fallback_part_tokens`=6000) → 1 часть, ассерты падают. Поднято до `"слово "*700` (~702 ×10 = 7020 > 6000) → 2 части. Модуль `fallback_cut` не менялся.
+11. **emit.py `emit_book`, чистка `.staging`**: `publish(staging_dir=lib_root/.staging/meta.id, …)` делает `os.replace` только дочерней директории, оставляя пустого родителя `.staging/`, что ломает ассерт `test_emit_book_layout` `not (lib/".staging").exists()`. Реализация добавляет `rmdir` пустого родителя после `publish` (с гардом `is_dir() and not any(iterdir())`) — безопасно: под `library_lock` конкурентного staging нет, а гард защищает и без инварианта.
 
 ## Roadmap после M1
 
