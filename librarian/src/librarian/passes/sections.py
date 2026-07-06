@@ -31,6 +31,39 @@ def r1_meta_sections(chapters: list[Chapter], ctx: DocContext) -> list[Chapter]:
     return kept
 
 
+_WS_RUN = re.compile(r"\s+")
+
+
+def _canon(s: str) -> str:
+    return _WS_RUN.sub(" ", s.casefold()).strip()
+
+
+def r2_toc(chapters: list[Chapter], ctx: DocContext) -> list[Chapter]:
+    cfg = ctx.cfg.clean
+    headings = {_canon(b.text) for b in ctx.raw.blocks
+                if b.kind is BlockKind.HEADING and b.text.strip()}
+    kept: list[Chapter] = []
+    removed: list[dict] = []
+    for ch in chapters:
+        tokens = draft_count(ch.blocks)
+        lines = [ln for b in ch.blocks for ln in b.text.split("\n") if ln.strip()]
+        if tokens > cfg.toc_max_tokens or not lines:
+            kept.append(ch)
+            continue
+        others = headings - {_canon(ch.title)}          # заголовки ДРУГИХ глав
+        numeric = sum(1 for ln in lines if ln.rstrip()[-1:].isdigit())
+        dup = sum(1 for ln in lines if _canon(ln) in others)
+        if (numeric / len(lines) > cfg.toc_numeric_line_ratio
+                or dup / len(lines) >= cfg.toc_heading_dup_ratio):
+            removed.append({"title": ch.title, "tokens": tokens,
+                            "text": _chapter_text(ch)})
+        else:
+            kept.append(ch)
+    if removed:
+        ctx.report.removed.setdefault("toc", []).extend(removed)
+    return kept
+
+
 def r3_merge_tiny(chapters: list[Chapter], ctx: DocContext) -> list[Chapter]:
     tiny = ctx.cfg.chapters.tiny_tokens
     chs = list(chapters)
@@ -158,7 +191,8 @@ def renumber(chapters: list[Chapter]) -> list[Chapter]:
     return chapters
 
 
-SECTION_PASSES = [r1_meta_sections, r3_merge_tiny, r4_split_giants, r5_drop_empty]
+SECTION_PASSES = [r1_meta_sections, r2_toc, r3_merge_tiny,
+                  r4_split_giants, r5_drop_empty]
 
 
 def apply_section_passes(chapters: list[Chapter], ctx: DocContext) -> list[Chapter]:
