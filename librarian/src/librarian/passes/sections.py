@@ -8,6 +8,29 @@ from librarian.tokens import block_tokens, draft_count
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
 
+def _chapter_text(ch: Chapter) -> str:
+    return "\n\n".join(b.text for b in ch.blocks)
+
+
+def r1_meta_sections(chapters: list[Chapter], ctx: DocContext) -> list[Chapter]:
+    cfg = ctx.cfg.clean
+    markers = tuple(m.casefold() for m in cfg.meta_markers)
+    kept: list[Chapter] = []
+    removed: list[dict] = []
+    for ch in chapters:
+        text = _chapter_text(ch)
+        low = text.casefold()
+        if (draft_count(ch.blocks) < cfg.meta_max_tokens
+                and any(m in low for m in markers)):
+            removed.append({"title": ch.title,
+                            "tokens": draft_count(ch.blocks), "text": text})
+        else:
+            kept.append(ch)
+    if removed:
+        ctx.report.removed.setdefault("meta_sections", []).extend(removed)
+    return kept
+
+
 def r3_merge_tiny(chapters: list[Chapter], ctx: DocContext) -> list[Chapter]:
     tiny = ctx.cfg.chapters.tiny_tokens
     chs = list(chapters)
@@ -135,7 +158,7 @@ def renumber(chapters: list[Chapter]) -> list[Chapter]:
     return chapters
 
 
-SECTION_PASSES = [r3_merge_tiny, r4_split_giants, r5_drop_empty]
+SECTION_PASSES = [r1_meta_sections, r3_merge_tiny, r4_split_giants, r5_drop_empty]
 
 
 def apply_section_passes(chapters: list[Chapter], ctx: DocContext) -> list[Chapter]:
