@@ -152,5 +152,25 @@ make_epub(EPUB_DIR / "bezgolov.epub", "Безголовая книга",
           nav_links=[("text1.xhtml#start", "Пролог"), ("text2.xhtml", "Эпилог")],
           ident="bezgolov")
 
+# DocBook-стиль (§6.4.3 отклонение): в файле — заголовок главы и заголовки
+# подразделов одним уровнем h1; nav — ровно одна запись на файл. Plan v3
+# (repair delta): part1.xhtml — heading-only part-разделитель перед главами.
+make_epub(EPUB_DIR / "spravochnik.epub", "Справочник программиста",
+          chapters=[("part1.xhtml", "<h1>Часть I. Основы</h1>"),
+                    ("ch1.xhtml",
+                     "<h1>Глава 1. Основы работы</h1>" + _CH +
+                     "<h1>1.1 Установка</h1>" + _CH +
+                     "<h2>1.1.1 Требования</h2>" + _CH +
+                     "<h1>1.2 Настройка</h1>" + _CH),
+                    ("ch2.xhtml",
+                     "<h1>Глава 2. Продвинутые приёмы</h1>" + _CH +
+                     "<h1>2.1 Оптимизация</h1>" + _CH +
+                     "<h2>2.1.1 Профилирование</h2>" + _CH +
+                     "<h1>2.2 Отладка</h1>" + _CH)],
+          nav_links=[("part1.xhtml", "Часть I. Основы"),
+                     ("ch1.xhtml", "Глава 1. Основы работы"),
+                     ("ch2.xhtml", "Глава 2. Продвинутые приёмы")],
+          ident="spravochnik")
+
 print("fixtures written")
 print("fb2/epub fixtures written")

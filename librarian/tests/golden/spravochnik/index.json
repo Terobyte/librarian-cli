@@ -1,0 +1,13 @@
+{
+  "books": [
+    {
+      "author": "Пелагея Морская",
+      "chapters": 2,
+      "id": "pelageya-morskaya-spravochnik-programmista",
+      "status": "ok",
+      "title": "Справочник программиста",
+      "total_tokens": 9335
+    }
+  ],
+  "pipeline_version": "2.2"
+}

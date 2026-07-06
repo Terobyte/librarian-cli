@@ -147,3 +147,150 @@ def test_nav_fixes_empty_heading(tmp_path):
                    nav_links=[("ch1.xhtml", "Глава первая")])
     heads = [b.text for b in raw.blocks if b.kind is BlockKind.HEADING]
     assert heads == ["Глава первая", "Глава вторая"]
+
+
+# --- DocBook flat-nav restructure (§6.4.3 отклонение, deviation) -----------
+
+
+def test_docbook_gate_triggers_on_file_with_two_h1_and_single_nav_entry(tmp_path):
+    # t1: 2 файла, файл ch1 — DocBook-стиль (h1 A + p + h1 B + h2 C + h1 D),
+    # 1 nav-запись на файл → A остаётся level 1 (origin epub-file), B/D → 2, C → 3.
+    # "Sec A" (не 1 символ) — чтобы не задеть несвязанную §6.4.5-починку bs[0].
+    raw = _extract(tmp_path,
+                   [("ch1.xhtml", "<h1>Sec A</h1><p>text</p><h1>B</h1><h2>C</h2><h1>D</h1>"),
+                    ("ch2.xhtml", "<h1>Chapter Two</h1><p>text</p>")],
+                   nav_links=[("ch1.xhtml", "Chapter One"), ("ch2.xhtml", "Chapter Two")])
+    heads = [(b.text, b.level, b.origin) for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert heads[:4] == [("Sec A", 1, "epub-file"), ("B", 2, ""), ("C", 3, ""), ("D", 2, "")]
+
+
+def test_docbook_gate_silent_without_nav_entry(tmp_path):
+    # t2: файл с 2×h1, но БЕЗ записи в nav → уровни не тронуты.
+    raw = _extract(tmp_path,
+                   [("ch1.xhtml", "<h1>A</h1><h1>B</h1>"),
+                    ("ch2.xhtml", "<h1>Chapter Two</h1><p>text</p>")],
+                   nav_links=[("ch2.xhtml", "Chapter Two")])
+    heads = [(b.text, b.level, b.origin) for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert heads[:2] == [("A", 1, ""), ("B", 1, "")]
+
+
+def test_docbook_gate_silent_on_povest_style_single_h1_per_file(tmp_path):
+    # t3: по одному h1 на файл (povest-стиль), полный nav → блоки идентичны прежним.
+    raw = _extract(tmp_path,
+                   [("ch1.xhtml", "<h1>Chapter One</h1><p>one</p>"),
+                    ("ch2.xhtml", "<h1>Chapter Two</h1><p>two</p>")],
+                   nav_links=[("ch1.xhtml", "Chapter One"), ("ch2.xhtml", "Chapter Two")])
+    heads = [(b.text, b.level, b.origin) for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert heads == [("Chapter One", 1, ""), ("Chapter Two", 1, "")]
+
+
+def test_docbook_gate_prepends_when_file_starts_with_para(tmp_path):
+    # t4: файл начинается с PARA, дальше 2×h1, nav есть → prepend nav-заголовок
+    # level 1, оба h1 → 2.
+    raw = _extract(tmp_path,
+                   [("ch1.xhtml", "<p>Intro para.</p><h1>A</h1><h1>B</h1>"),
+                    ("ch2.xhtml", "<h1>Chapter Two</h1><p>text</p>")],
+                   nav_links=[("ch1.xhtml", "Chapter One"), ("ch2.xhtml", "Chapter Two")])
+    heads = [(b.text, b.level, b.origin) for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert heads[:3] == [("Chapter One", 1, "epub-file"), ("A", 2, ""), ("B", 2, "")]
+
+
+def test_docbook_restructure_runs_after_empty_heading_fix(tmp_path):
+    # t5: первый заголовок пустой/односимвольный + гейт срабатывает → сначала
+    # §6.4.5 подставляет nav-текст, потом этот же блок становится epub-file
+    # заголовком уровня 1 (порядок — инвариант, m6).
+    raw = _extract(tmp_path,
+                   [("ch1.xhtml", "<h1>*</h1><p>text</p><h1>B</h1>"),
+                    ("ch2.xhtml", "<h1>Chapter Two</h1><p>two</p>")],
+                   nav_links=[("ch1.xhtml", "Chapter One"), ("ch2.xhtml", "Chapter Two")])
+    heads = [(b.text, b.level, b.origin) for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert heads[:2] == [("Chapter One", 1, "epub-file"), ("B", 2, "")]
+
+
+def test_docbook_gate_is_per_file_in_mixed_book(tmp_path):
+    # t6: смешанная книга — честный файл (1 h1 + h2) не трогается байт-в-байт,
+    # DocBook-файл (2×h1) рядом перестраивается.
+    # "Sec A" (не 1 символ) — чтобы не задеть несвязанную §6.4.5-починку bs[0].
+    raw = _extract(tmp_path,
+                   [("honest.xhtml", "<h1>Honest Chapter</h1><h2>Sub</h2><p>text</p>"),
+                    ("doc.xhtml", "<h1>Sec A</h1><h1>B</h1>")],
+                   nav_links=[("honest.xhtml", "Honest Chapter"), ("doc.xhtml", "Doc Chapter")])
+    heads = [(b.text, b.level, b.origin) for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert heads == [("Honest Chapter", 1, ""), ("Sub", 2, ""),
+                      ("Sec A", 1, "epub-file"), ("B", 2, "")]
+
+
+def test_docbook_gate_silent_on_fragmented_nav(tmp_path):
+    # t7: 2 nav-записи на один файл (f.xhtml#a, f.xhtml#b) при 2×h1 → не тронут
+    # (nav_counts == 2, файл — несколько TOC-единиц, не одна).
+    # "Sec A" (не 1 символ) — чтобы не задеть несвязанную §6.4.5-починку bs[0].
+    raw = _extract(tmp_path,
+                   [("f.xhtml", "<h1>Sec A</h1><h1>B</h1>"),
+                    ("ch2.xhtml", "<h1>Chapter Two</h1><p>two</p>")],
+                   nav_links=[("f.xhtml#a", "Part A"), ("f.xhtml#b", "Part B"),
+                              ("ch2.xhtml", "Chapter Two")])
+    heads = [(b.text, b.level, b.origin) for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert heads[:2] == [("Sec A", 1, ""), ("B", 1, "")]
+
+
+# --- part-divider между DocBook-файлами (Plan v3, repair delta) ------------
+
+
+def test_part_divider_between_docbook_files_becomes_level1_ancestor(tmp_path):
+    # t8: divider-файл (ровно один h1, без остального контента) перед DocBook-
+    # главой → divider остаётся level 1 (origin=epub-part), глава сдвигается
+    # на +1 (2), её подраздел — ещё на +1 (3).
+    raw = _extract(tmp_path,
+                   [("part1.xhtml", "<h1>Part One</h1>"),
+                    ("ch1.xhtml", "<h1>Chapter One</h1><p>text</p><h1>Sub</h1>")],
+                   nav_links=[("part1.xhtml", "Part One"), ("ch1.xhtml", "Chapter One")])
+    heads = [(b.text, b.level, b.origin) for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert heads == [("Part One", 1, "epub-part"),
+                      ("Chapter One", 2, "epub-file"),
+                      ("Sub", 3, "")]
+
+
+def test_part_divider_untouched_without_docbook_files(tmp_path):
+    # t9: divider-по-форме файл в книге БЕЗ единого DocBook-гейта (все файлы —
+    # по одному h1) → ни тегирования, ни сдвига уровней (restructured_any=False).
+    raw = _extract(tmp_path,
+                   [("part1.xhtml", "<h1>Part One</h1>"),
+                    ("ch1.xhtml", "<h1>Chapter One</h1><p>one</p>"),
+                    ("ch2.xhtml", "<h1>Chapter Two</h1><p>two</p>")],
+                   nav_links=[("part1.xhtml", "Part One"), ("ch1.xhtml", "Chapter One"),
+                              ("ch2.xhtml", "Chapter Two")])
+    heads = [(b.text, b.level, b.origin) for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert heads == [("Part One", 1, ""), ("Chapter One", 1, ""), ("Chapter Two", 1, "")]
+
+
+def test_heading_plus_para_file_is_not_a_divider(tmp_path):
+    # t10: copyright-стиль файл (h1 + p) НЕ divider даже с одним заголовком —
+    # структурное условие divider'а требует РОВНО один блок в файле.
+    raw = _extract(tmp_path,
+                   [("part1.xhtml", "<h1>Part One</h1>"),
+                    ("copyright.xhtml", "<h1>Copyright</h1><p>All rights reserved.</p>"),
+                    ("ch1.xhtml", "<h1>Chapter One</h1><p>text</p><h1>Sub</h1>")],
+                   nav_links=[("part1.xhtml", "Part One"), ("copyright.xhtml", "Copyright"),
+                              ("ch1.xhtml", "Chapter One")])
+    heads = [(b.text, b.level, b.origin) for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert heads == [("Part One", 1, "epub-part"),
+                      ("Copyright", 2, ""),
+                      ("Chapter One", 2, "epub-file"),
+                      ("Sub", 3, "")]
+
+
+def test_trailing_heading_only_file_is_not_a_divider(tmp_path):
+    # t11: хвостовой heading-only файл (нет файла ПОСЛЕ него) не тегируется
+    # divider'ом (B2'), но всё равно попадает под общий сдвиг уровней, раз
+    # книга уже содержит restructured-файл и другой помеченный divider.
+    raw = _extract(tmp_path,
+                   [("part1.xhtml", "<h1>Part One</h1>"),
+                    ("ch1.xhtml", "<h1>Chapter One</h1><p>text</p><h1>Sub</h1>"),
+                    ("trailing.xhtml", "<h1>The End</h1>")],
+                   nav_links=[("part1.xhtml", "Part One"), ("ch1.xhtml", "Chapter One"),
+                              ("trailing.xhtml", "The End")])
+    heads = [(b.text, b.level, b.origin) for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert heads == [("Part One", 1, "epub-part"),
+                      ("Chapter One", 2, "epub-file"),
+                      ("Sub", 3, ""),
+                      ("The End", 2, "")]
