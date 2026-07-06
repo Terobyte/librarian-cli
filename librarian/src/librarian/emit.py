@@ -11,10 +11,12 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from librarian import PIPELINE_VERSION
 from librarian.config import Config
 from librarian.errors import LibError
-from librarian.ir import Block, BlockKind, Chapter
+from librarian.ir import Block, BlockKind, BookMeta, Chapter
 from librarian.slug import slugify
+from librarian.tokens import count as _tok_count
 
 if os.name == "nt":
     import msvcrt
@@ -152,3 +154,77 @@ def publish(staging_dir: Path, lib_root: Path, book_id: str) -> Path:
     os.replace(staging_dir, target)
     shutil.rmtree(lib_root / ".trash", ignore_errors=True)
     return target
+
+
+def build_summary(ch: Chapter) -> str:
+    base = ""
+    for b in ch.blocks:
+        if b.kind is BlockKind.PARA and _tok_count(b.text) >= 15:
+            base = _cut_300(b.text)
+            break
+    if not base:
+        first = next((b for b in ch.blocks if b.text.strip()), None)
+        base = _cut_300(first.text) if first else ""
+    subs = [b.text for b in ch.blocks if b.kind is BlockKind.HEADING][:8]
+    if subs:
+        base = (base + " — " if base else "") + " · ".join(subs)
+    return base
+
+
+def _cut_300(text: str) -> str:
+    text = " ".join(text.split())
+    if len(text) <= 300:
+        return text
+    cut = text[:300].rsplit(" ", 1)[0]
+    return cut + "…"
+
+
+def lang_heuristic(text: str) -> str | None:
+    letters = [ch for ch in text if ch.isalpha()]
+    if not letters:
+        return None
+    cyr = sum(1 for ch in letters if "а" <= ch.casefold() <= "я" or ch.casefold() == "ё")
+    lat = sum(1 for ch in letters if ch.isascii())
+    if cyr / len(letters) >= 0.5:
+        return "ru"
+    if lat / len(letters) >= 0.5:
+        return "en"
+    return None
+
+
+def emit_book(meta: BookMeta, chapters: list[Chapter], report: dict,
+              lib_root: Path, cfg: Config) -> Path:
+    staging = lib_root / ".staging" / meta.id
+    if staging.exists():
+        shutil.rmtree(staging)
+    (staging / "chapters").mkdir(parents=True)
+    entries = []
+    for ch in chapters:
+        fname = chapter_filename(ch, cfg)
+        (staging / "chapters" / fname).write_text(render_chapter(ch),
+                                                  encoding="utf-8", newline="\n")
+        entries.append({"n": ch.n, "file": f"chapters/{fname}", "title": ch.title,
+                        "tokens": ch.tokens, "summary": build_summary(ch)})
+    book = {
+        "id": meta.id, "title": meta.title, "author": meta.author, "lang": meta.lang,
+        "meta_locked": meta.meta_locked,
+        "source": {"file": meta.source_path.name, "format": meta.fmt.value,
+                   "sha256": meta.sha256},
+        "provenance": {"ingested_at": ingested_at(),
+                       "pipeline_version": PIPELINE_VERSION,
+                       "config_hash": meta.config_hash,
+                       "cache_key": meta.cache_key},
+        "quality": {"status": meta.status, "score": meta.score},
+        "total_tokens": sum(ch.tokens for ch in chapters),
+        "chapters": entries,
+    }
+    (staging / "book.json").write_text(canonical_json(book), encoding="utf-8", newline="\n")
+    (staging / "report.json").write_text(canonical_json(report), encoding="utf-8", newline="\n")
+    if meta.keep_source:
+        (staging / "source").mkdir()
+        shutil.copyfile(meta.source_path, staging / "source" / meta.source_path.name)
+    out = publish(staging, lib_root, meta.id)
+    staging_parent = lib_root / ".staging"
+    if staging_parent.is_dir() and not any(staging_parent.iterdir()):
+        staging_parent.rmdir()
+    return out
