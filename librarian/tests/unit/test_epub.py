@@ -108,3 +108,42 @@ def test_registered():
     from librarian.extractors.base import get_extractor
     from librarian.ir import Format
     assert type(get_extractor(Format.EPUB)).__name__ == "EpubExtractor"
+
+
+def test_fallback_chapter_per_file(tmp_path):
+    raw = _extract(tmp_path,
+                   [("text1.xhtml", "<p>Первый файл без заголовков.</p>"),
+                    ("text2.xhtml", "<p>Второй файл, тоже голый.</p>")],
+                   nav_links=[("text1.xhtml#start", "Пролог"),
+                              ("text1.xhtml#more", "Дубль — игнор"),
+                              ("text2.xhtml", "Эпилог")])
+    heads = [(b.text, b.level, b.origin) for b in raw.blocks
+             if b.kind is BlockKind.HEADING]
+    assert heads == [("Пролог", 1, "epub-fallback"), ("Эпилог", 1, "epub-fallback")]
+
+
+def test_fallback_without_nav_uses_first_para(tmp_path):
+    raw = _extract(tmp_path,
+                   [("text1.xhtml", "<p>Однажды на рассвете кит выплыл к берегу.</p>"),
+                    ("text2.xhtml", "<p>Вторая часть истории про кита и шторм.</p>")],
+                   nav_links=[])
+    heads = [b.text for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert heads[0] == "Однажды на рассвете кит выплыл к берегу."[:60]
+    assert len(heads) == 2
+
+
+def test_no_fallback_when_headings_exist(tmp_path):
+    raw = _extract(tmp_path,
+                   [("ch1.xhtml", "<h1>Глава 1</h1><p>Раз.</p>"),
+                    ("ch2.xhtml", "<h1>Глава 2</h1><p>Два.</p>")],
+                   nav_links=[("ch1.xhtml", "Глава 1"), ("ch2.xhtml", "Глава 2")])
+    assert all(b.origin != "epub-fallback" for b in raw.blocks)
+
+
+def test_nav_fixes_empty_heading(tmp_path):
+    raw = _extract(tmp_path,
+                   [("ch1.xhtml", "<h1>*</h1><p>Текст первой.</p>"),
+                    ("ch2.xhtml", "<h1>Глава вторая</h1><p>Текст второй.</p>")],
+                   nav_links=[("ch1.xhtml", "Глава первая")])
+    heads = [b.text for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert heads == ["Глава первая", "Глава вторая"]

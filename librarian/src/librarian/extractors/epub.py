@@ -31,6 +31,28 @@ def _dc(book, name: str) -> str | None:
     return None
 
 
+def _nav_titles(book) -> dict[str, str]:
+    """href (basename, без фрагмента) → название; первая запись побеждает."""
+    out: dict[str, str] = {}
+
+    def walk(items) -> None:
+        for it in items:
+            if isinstance(it, tuple):                   # (Section, [children])
+                sec, children = it
+                href = getattr(sec, "href", "") or ""
+                if href and sec.title and _basename(href) not in out:
+                    out[_basename(href)] = sec.title
+                walk(children)
+            else:                                       # Link
+                href = getattr(it, "href", "") or ""
+                title = getattr(it, "title", "") or ""
+                if href and title and _basename(href) not in out:
+                    out[_basename(href)] = title
+
+    walk(book.toc or [])
+    return out
+
+
 class EpubExtractor:
     format = Format.EPUB
 
@@ -60,7 +82,26 @@ class EpubExtractor:
             ref_parts.append(body.text_content())
         if not per_file:
             raise BrokenFileError(f"{path.name}: в EPUB нет контентных документов")
-        blocks = [b for _, bs in per_file for b in bs]
+        titles = _nav_titles(book)
+        n_heads = sum(1 for _, bs in per_file for b in bs
+                      if b.kind is BlockKind.HEADING)
+        blocks: list[Block] = []
+        if n_heads < 2:                                  # §6.4.4: файл = секция
+            for name, bs in per_file:
+                t = titles.get(name)
+                if not t:
+                    first = next((b.text for b in bs
+                                  if b.kind is BlockKind.PARA), "")
+                    t = first[:60] or name
+                blocks.append(Block(BlockKind.HEADING, t, level=1,
+                                    origin="epub-fallback"))
+                blocks.extend(bs)
+        else:                                            # §6.4.5: nav чинит пустые названия
+            for name, bs in per_file:
+                if (bs and bs[0].kind is BlockKind.HEADING
+                        and len(bs[0].text.strip()) <= 1 and titles.get(name)):
+                    bs[0].text = titles[name]
+                blocks.extend(bs)
         return RawDoc(fmt=Format.EPUB, blocks=blocks, title=_dc(book, "title"),
                       author=_dc(book, "creator"), lang=_dc(book, "language"),
                       ref_text="\n".join(ref_parts))
