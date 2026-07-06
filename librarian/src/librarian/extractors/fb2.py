@@ -1,13 +1,14 @@
 # src/librarian/extractors/fb2.py
 from __future__ import annotations
 
+import zipfile
 from pathlib import Path
 
 from lxml import etree
 
 from librarian.config import Config
 from librarian.errors import BrokenFileError
-from librarian.extractors import base
+from librarian.extractors import base, zipsafe
 from librarian.ir import Block, BlockKind, Format, RawDoc
 from librarian.xmlsafe import parse_xml
 
@@ -131,7 +132,17 @@ def _metadata(root):
 
 
 def _read_source(path: Path, cfg: Config) -> bytes:
-    return path.read_bytes()
+    with path.open("rb") as f:
+        head = f.read(4)
+    if not head.startswith(b"PK"):
+        return path.read_bytes()
+    zipsafe.check_zip(path, cfg)                  # fb2.zip: сначала лимиты §6.0
+    with zipfile.ZipFile(path) as z:
+        names = [n for n in z.namelist()
+                 if n.casefold().endswith(".fb2") and not n.endswith("/")]
+    if len(names) != 1:                           # detect гарантирует, но не доверяем
+        raise BrokenFileError(f"{path.name}: в архиве не ровно один .fb2")
+    return zipsafe.read_entry(path, names[0], cfg)
 
 
 class Fb2Extractor:

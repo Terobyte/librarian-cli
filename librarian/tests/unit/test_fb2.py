@@ -132,3 +132,35 @@ def test_notes_body_not_in_main_flow(tmp_path):
 def test_no_notes_no_synthetic_chapter(tmp_path):
     raw = _extract(tmp_path, "<body><section><p>Текст.</p></section></body>")
     assert all(b.text != "Примечания" for b in raw.blocks)
+
+
+def _make_fb2_zip(tmp_path, fb2_text: str, extra=()):
+    import zipfile
+    p = tmp_path / "arhiv.zip"
+    with zipfile.ZipFile(p, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("kniga.fb2", fb2_text.encode("utf-8"))
+        for name, data in extra:
+            z.writestr(name, data)
+    return p
+
+
+def test_fb2_zip(tmp_path):
+    p = _make_fb2_zip(tmp_path, _TPL.format(
+        bodies="<body><section><p>Из архива.</p></section></body>"))
+    raw = Fb2Extractor().extract(p, load_config(None))
+    assert raw.title == "Сказка о ките"
+    assert any("Из архива" in b.text for b in raw.blocks)
+
+
+def test_fb2_zip_bomb(tmp_path):
+    import dataclasses
+    import pytest
+    from librarian.config import LimitsCfg
+    from librarian.errors import BrokenFileError
+    p = _make_fb2_zip(tmp_path,
+                      _TPL.format(bodies="<body><section><p>x</p></section></body>"),
+                      extra=[("padding.bin", b"\0" * (2 * 1024 * 1024))])
+    cfg = dataclasses.replace(load_config(None),
+                              limits=LimitsCfg(zip_max_uncompressed_mb=1))
+    with pytest.raises(BrokenFileError, match="zip-bomb"):
+        Fb2Extractor().extract(p, cfg)
