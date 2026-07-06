@@ -164,3 +164,36 @@ def test_fb2_zip_bomb(tmp_path):
                               limits=LimitsCfg(zip_max_uncompressed_mb=1))
     with pytest.raises(BrokenFileError, match="zip-bomb"):
         Fb2Extractor().extract(p, cfg)
+
+
+_XXE_FB2 = """<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE FictionBook [<!ENTITY leak SYSTEM "secret.txt">]>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0">
+<description><title-info><book-title>Ловушка</book-title></title-info></description>
+<body><section><title><p>Глава 1</p></title>
+<p>До сноски &leak; после сноски.</p>
+<p>Обычный длинный абзац, чтобы у главы был вес и книга сохранилась.</p>
+</section></body>
+</FictionBook>"""
+
+
+def test_xxe_entity_not_expanded(tmp_path):
+    (tmp_path / "secret.txt").write_text("СОВЕРШЕННО СЕКРЕТНО", encoding="utf-8")
+    p = tmp_path / "xxe.fb2"
+    p.write_text(_XXE_FB2, encoding="utf-8")
+    raw = Fb2Extractor().extract(p, load_config(None))
+    joined = " ".join(b.text for b in raw.blocks) + raw.ref_text
+    assert "СЕКРЕТНО" not in joined
+
+
+def test_xxe_ingest_end_to_end(tmp_path):
+    from librarian.pipeline import run_ingest
+    (tmp_path / "secret.txt").write_text("СОВЕРШЕННО СЕКРЕТНО", encoding="utf-8")
+    p = tmp_path / "xxe.fb2"
+    p.write_text(_XXE_FB2, encoding="utf-8")
+    lib = tmp_path / "lib"
+    outcomes = run_ingest([p], load_config(None), lib)
+    assert outcomes[0].status != "ok" or outcomes[0].book_id   # сохранилась или честный отказ
+    leaked = [f for f in lib.rglob("*.md")
+              if "СЕКРЕТНО" in f.read_text(encoding="utf-8")]
+    assert leaked == []
