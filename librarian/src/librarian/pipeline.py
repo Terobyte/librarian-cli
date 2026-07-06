@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import sys
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,6 +31,7 @@ class IngestOutcome:
     status: str
     score: float | None
     message: str = ""
+    traceback: str = ""        # полный трейс для --verbose (§16); пусто на успехе
 
 
 def run_ingest(paths: list[Path], cfg: Config, lib_root: Path,
@@ -48,9 +50,10 @@ def _safe_ingest(path: Path, cfg: Config, lib_root: Path, force: bool) -> Ingest
     except DetectError as e:
         return IngestOutcome(path, None, "skipped", None, str(e))
     except LibError as e:
-        return IngestOutcome(path, None, "failed", None, str(e))
+        return IngestOutcome(path, None, "failed", None, str(e), traceback.format_exc())
     except Exception as e:                          # noqa: BLE001 — §16: пакет не падает
-        return IngestOutcome(path, None, "failed", None, f"{type(e).__name__}: {e}")
+        return IngestOutcome(path, None, "failed", None,
+                             f"{type(e).__name__}: {e}", traceback.format_exc())
 
 
 def ingest_file(path: Path, cfg: Config, lib_root: Path,

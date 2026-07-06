@@ -34,6 +34,7 @@ def merge_lines(lines: list[str], cfg: Config) -> str:
             # «ка» исключено: оно в keep_hyphen_suffixes (частица «ну-ка»), но в
             # прозе разрыв «нау-ка»/«ру-ка» встречается несравнимо чаще — дефис
             # убираем. Остальные частицы (то/либо/нибудь/таки) сохраняют дефис.
+            # Осознанное отклонение (см. deviations в плане M1).
             if suffix in cfg.clean.keep_hyphen_suffixes and suffix != "ка":
                 out += nxt
             else:

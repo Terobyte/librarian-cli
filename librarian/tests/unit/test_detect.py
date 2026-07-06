@@ -63,3 +63,26 @@ def test_broken_zip(tmp_path):
     p = tmp_path / "x.epub"; p.write_bytes(b"PK\x03\x04" + b"\x00" * 30)
     with pytest.raises(BrokenFileError):
         detect(p)
+
+
+def test_detect_no_fd_leak(tmp_path, monkeypatch):
+    from pathlib import Path
+    p = tmp_path / "test.txt"
+    p.write_text("Some text content to detect as plain txt", encoding="utf-8")
+    
+    opened_files = []
+    original_open = Path.open
+    
+    def mock_open(self, *args, **kwargs):
+        f = original_open(self, *args, **kwargs)
+        opened_files.append(f)
+        return f
+        
+    monkeypatch.setattr(Path, "open", mock_open)
+    
+    detect(p)
+    
+    assert len(opened_files) > 0
+    for f in opened_files:
+        assert f.closed, f"File {f} was not closed!"
+

@@ -45,3 +45,14 @@ def test_emit_book_layout(tmp_path):
     assert (out / "source" / "роман.txt").read_text(encoding="utf-8") == "исходник"
     assert (out / "report.json").exists()
     assert not (lib / ".staging").exists()
+
+
+def test_ingested_at_bad_source_date_epoch(monkeypatch):
+    from librarian.emit import ingested_at
+    # Задаем некорректный SOURCE_DATE_EPOCH
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "garbage")
+    # Должен отработать без падения ( ValueError ) и вернуть валидную таймзону ISO
+    res = ingested_at()
+    assert len(res) == 20
+    assert res.endswith("Z")
+

@@ -133,7 +133,12 @@ _QUALITY_TABLES = {"status": {"ok_min": "ok_min", "failed_max": "failed_max"},
 def load_config(path: Path | None = None, *, keep_source: bool = True) -> Config:
     overrides: dict = {}
     if path is not None:
-        overrides = tomllib.loads(path.read_text(encoding="utf-8"))
+        try:
+            overrides = tomllib.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            raise LibError(f"конфиг не найден: {path}") from None
+        except (OSError, tomllib.TOMLDecodeError) as e:
+            raise LibError(f"не удалось прочитать конфиг {path}: {e}") from None
     kwargs: dict = {"keep_source": keep_source}
     for name, cls in sorted(_SECTIONS.items()):
         section = dict(overrides.get(name, {}))

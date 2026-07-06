@@ -62,3 +62,63 @@ def test_rm(lib):
     assert r.exit_code == 0 and not (lib_dir / bid).exists()
     idx = json.loads((lib_dir / "index.json").read_text(encoding="utf-8"))
     assert idx["books"] == []
+
+
+def test_ingest_verbose_traceback(tmp_path):
+    # BUG 3: --verbose должен печатать traceback в stderr при падении
+    r = runner.invoke(app, ["--library", str(tmp_path / "lib"), "ingest", str(tmp_path / "non_existent.txt"), "--verbose"])
+    assert r.exit_code == 1
+    assert "Traceback (most recent call last):" in r.stderr
+    
+    # Без флага --verbose трейсбека быть не должно, только сообщение об ошибке
+    r2 = runner.invoke(app, ["--library", str(tmp_path / "lib"), "ingest", str(tmp_path / "non_existent.txt")])
+    assert r2.exit_code == 1
+    assert "Traceback" not in r2.stderr
+
+
+def test_ingest_bad_config(tmp_path):
+    # BUG 4: --config с отсутствующим/битым файлом не должен бросать python traceback пользователю
+    r1 = runner.invoke(app, ["--library", str(tmp_path / "lib"), "ingest", "some.txt", "--config", str(tmp_path / "no_such_config.toml")])
+    assert r1.exit_code == 1
+    assert "Traceback (most recent call last)" not in r1.stderr
+    assert "конфиг" in r1.stderr
+
+    bad_cfg = tmp_path / "bad.toml"
+    bad_cfg.write_text("invalid = { [", encoding="utf-8")
+    r2 = runner.invoke(app, ["--library", str(tmp_path / "lib"), "ingest", "some.txt", "--config", str(bad_cfg)])
+    assert r2.exit_code == 1
+    assert "Traceback (most recent call last)" not in r2.stderr
+    assert "конфиг" in r2.stderr
+
+
+@pytest.mark.xfail(reason="--budget/--from — фича M5 по §18, в M1 не реализована", strict=False)
+def test_get_budget_spec_conflict(lib):
+    lib_dir, bid = lib
+    # BUG 5: spec и --budget взаимоисключающие, должны выдавать exit 2
+    r = runner.invoke(app, ["--library", str(lib_dir), "get", bid, "1-2", "--budget", "12000"])
+    assert r.exit_code == 2
+
+
+@pytest.mark.xfail(reason="--budget/--from — фича M5 по §18, в M1 не реализована", strict=False)
+def test_get_budget_and_from_options(lib):
+    # BUG 5: get должен принимать --budget и --from
+    lib_dir, bid = lib
+    r = runner.invoke(app, ["--library", str(lib_dir), "get", bid, "--budget", "12000", "--from", "1"])
+    # не должно быть ошибки разбора опций (exit 2)
+    assert r.exit_code != 2
+
+
+def test_rm_path_traversal_protection(lib):
+    # BUG 10: rm не должен принимать произвольные book_id с path traversal
+    lib_dir, bid = lib
+    sibling = lib_dir.parent / "sibling"
+    sibling.mkdir(exist_ok=True)
+    (sibling / "book.json").write_text("{}", encoding="utf-8")
+    
+    r = runner.invoke(app, ["--library", str(lib_dir), "rm", "../sibling"])
+    assert r.exit_code == 1
+    # Проверяем, что соседняя директория НЕ была удалена
+    assert (sibling / "book.json").exists()
+    import shutil
+    shutil.rmtree(sibling, ignore_errors=True)
+

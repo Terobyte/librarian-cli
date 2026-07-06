@@ -93,7 +93,10 @@ def render_chapter(ch: Chapter) -> str:
 
 def ingested_at() -> str:
     sde = os.environ.get("SOURCE_DATE_EPOCH")
-    ts = int(sde) if sde else int(time.time())
+    try:
+        ts = int(sde) if sde else int(time.time())
+    except (TypeError, ValueError):                 # мусор в SOURCE_DATE_EPOCH не валит батч
+        ts = int(time.time())
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 

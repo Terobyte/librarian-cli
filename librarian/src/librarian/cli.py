@@ -55,7 +55,11 @@ def ingest(paths: list[Path],
            no_keep_source: bool = typer.Option(False, "--no-keep-source"),
            config: Path | None = typer.Option(None, "--config"),
            verbose: bool = typer.Option(False, "--verbose")) -> None:
-    cfg = load_config(config, keep_source=not no_keep_source)
+    try:
+        cfg = load_config(config, keep_source=not no_keep_source)
+    except LibError as e:
+        _err.print(str(e))
+        raise typer.Exit(1)
     outcomes = run_ingest(paths, cfg, _lib_root(), force=force)
     table = Table("файл", "id", "статус", "score")
     for o in outcomes:
@@ -63,6 +67,8 @@ def ingest(paths: list[Path],
                       f"{o.score:.2f}" if o.score is not None else "—")
         if o.message:
             _err.print(f"  {o.path.name}: {o.message}")
+        if verbose and o.traceback:
+            _err.print(o.traceback, markup=False, highlight=False, soft_wrap=True)
     _err.print(table)
     if any(o.status == "failed" for o in outcomes):
         raise typer.Exit(1)
@@ -136,6 +142,11 @@ def rm(book_id: str) -> None:
         with library_lock(lib, cfg.general.lock_timeout_s):
             recover(lib)
             target = lib / book_id
+            resolved = target.resolve()
+            if ("/" in book_id or "\\" in book_id
+                    or resolved == lib.resolve()
+                    or not resolved.is_relative_to(lib.resolve())):
+                raise LibError(f"недопустимый id книги: «{book_id}»")
             if not (target / "book.json").is_file():
                 raise LibError(f"книга «{book_id}» не найдена")
             shutil.rmtree(target)

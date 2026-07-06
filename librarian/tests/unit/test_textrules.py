@@ -10,6 +10,7 @@ def test_merge_particle_keeps_hyphen():
     assert merge_lines(["кто-", "то пришёл"], CFG) == "кто-то пришёл"
     assert merge_lines(["как-", "нибудь потом"], CFG) == "как-нибудь потом"
 
+
 def test_merge_capital_next_is_space_join():
     assert merge_lines(["тире-", "Москва"], CFG) == "тире- Москва"
 

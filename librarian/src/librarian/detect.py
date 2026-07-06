@@ -14,7 +14,8 @@ _SKIP = re.compile(r"(?:\s+|<\?.*?\?>|<!--.*?-->)", re.S)
 
 
 def detect(path: Path) -> Format:
-    head = path.open("rb").read(1024)
+    with path.open("rb") as f:
+        head = f.read(1024)
     if b"%PDF" in head:
         return Format.PDF
     if head[:4] in (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"):
@@ -52,7 +53,8 @@ def _detect_zip(path: Path) -> Format:
 
 
 def _first_significant_tag(path: Path) -> str:
-    data = path.open("rb").read(4096)
+    with path.open("rb") as f:
+        data = f.read(4096)
     if data.startswith(b"\xef\xbb\xbf"):
         text = data[3:].decode("utf-8", errors="replace")
     elif data[:2] in (b"\xff\xfe", b"\xfe\xff"):

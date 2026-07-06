@@ -1,3 +1,4 @@
+import pytest
 from librarian.config import Config
 from librarian.ir import Block, BlockKind, Chapter, DocContext, Format, RawDoc, ReportDraft
 from librarian.passes.sections import apply_section_passes, r3_merge_tiny, r4_split_giants
@@ -45,3 +46,44 @@ def test_pipeline_numbering():
     chs = [Chapter(0, "A", [_big_para()]), Chapter(0, "B", []), Chapter(0, "C", [_big_para()])]
     out = apply_section_passes(chs, _ctx())
     assert [c.n for c in out] == [1, 2]
+
+
+@pytest.mark.xfail(reason="R1/R2 (мета-секции/печатное оглавление) — scope M2 по §18, в M1 не реализованы", strict=False)
+def test_r1_drop_meta_sections():
+    # Глава с маркером ISBN и длиной меньше 150 токенов должна быть удалена
+    ctx = _ctx()
+    meta_ch = Chapter(0, "Копирайт", [Block(BlockKind.PARA, "ISBN 123-456-789")])
+    normal_ch = Chapter(0, "Глава 1", [_big_para()])
+    
+    # Импортируем динамически, так как функций может еще не быть в коде
+    from librarian.passes.sections import r1_drop_meta_sections
+    out = r1_drop_meta_sections([meta_ch, normal_ch], ctx)
+    
+    assert len(out) == 1
+    assert out[0].title == "Глава 1"
+    assert len(ctx.report.removed.get("meta_sections", [])) == 1
+    assert ctx.report.removed["meta_sections"][0]["title"] == "Копирайт"
+    assert "ISBN" in ctx.report.removed["meta_sections"][0]["text"]
+
+
+@pytest.mark.xfail(reason="R1/R2 (мета-секции/печатное оглавление) — scope M2 по §18, в M1 не реализованы", strict=False)
+def test_r2_drop_toc():
+    ctx = _ctx()
+    # Глава, имитирующая оглавление (большинство строк заканчивается цифрой)
+    toc_blocks = [
+        Block(BlockKind.PARA, "Глава первая... 5"),
+        Block(BlockKind.PARA, "Глава вторая... 12"),
+        Block(BlockKind.PARA, "Глава третья... 20"),
+        Block(BlockKind.PARA, "Обычный текст без цифры")
+    ]
+    toc_ch = Chapter(0, "Содержание", toc_blocks)
+    normal_ch = Chapter(0, "Глава 1", [_big_para()])
+    
+    from librarian.passes.sections import r2_drop_toc
+    out = r2_drop_toc([toc_ch, normal_ch], ctx)
+    
+    assert len(out) == 1
+    assert out[0].title == "Глава 1"
+    assert len(ctx.report.removed.get("toc", [])) == 1
+    assert ctx.report.removed["toc"][0]["title"] == "Содержание"
+
