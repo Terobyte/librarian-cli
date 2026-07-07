@@ -71,7 +71,8 @@ def ingest_file(path: Path, cfg: Config, lib_root: Path,
         if existing:
             return IngestOutcome(path, existing, "skipped", None, "уже в библиотеке")
     raw = get_extractor(fmt).extract(path, cfg)                          # 4
-    ctx = DocContext(fmt, cfg, raw, ReportDraft())                       # 5
+    ctx = DocContext(fmt, cfg, raw,
+                     ReportDraft(unknown_tags=dict(raw.unknown_tags)))         # 5
     blocks = apply_block_passes(raw.blocks, ctx)                         # 6
     if any(b.kind is BlockKind.HEADING for b in blocks):                 # 7
         blocks = normalize_heading_levels(blocks)

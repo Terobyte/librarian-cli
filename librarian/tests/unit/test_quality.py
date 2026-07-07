@@ -36,3 +36,22 @@ def test_report_schema():
     assert set(rep) >= {"pipeline_version", "config_hash", "status", "score",
                         "metrics", "subscores", "hard_triggers", "removed", "warnings"}
     assert rep["hard_triggers"] == trig
+
+def test_report_unknown_tags_only_when_present():
+    # §6.6: неизвестные теги trafilatura не молча; до M4 ключ пишется
+    # только непустым, чтобы не менять байты старых golden (отклонение 17).
+    from librarian.config import load_config
+    from librarian.ir import DocContext, Format, RawDoc, ReportDraft
+    from librarian.quality import build_report, compute_metrics, score_and_status
+
+    cfg = load_config(None)
+    raw = RawDoc(fmt=Format.HTML, blocks=[], title=None, author=None,
+                 lang=None, ref_text="")
+    ctx = DocContext(Format.HTML, cfg, raw, ReportDraft())
+    m = compute_metrics([], ctx)
+    score, status, subs, trig = score_and_status(m, cfg)
+    assert "unknown_tags" not in build_report(ctx, m, subs, trig, score, status, cfg)
+
+    ctx.report.unknown_tags["graphic"] = 2
+    rep = build_report(ctx, m, subs, trig, score, status, cfg)
+    assert rep["unknown_tags"] == {"graphic": 2}

@@ -46,7 +46,7 @@ def score_and_status(m: Metrics, cfg: Config) -> tuple[float, str, dict, list[st
 
 def build_report(ctx: DocContext, m: Metrics, subscores: dict, triggers: list[str],
                  score: float, status: str, cfg: Config) -> dict:
-    return {
+    report = {
         "pipeline_version": PIPELINE_VERSION,
         "config_hash": config_hash(cfg),
         "status": status,
@@ -59,3 +59,6 @@ def build_report(ctx: DocContext, m: Metrics, subscores: dict, triggers: list[st
         "removed": ctx.report.removed,
         "warnings": ctx.report.warnings,
     }
+    if ctx.report.unknown_tags:
+        report["unknown_tags"] = dict(sorted(ctx.report.unknown_tags.items()))
+    return report

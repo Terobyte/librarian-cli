@@ -55,6 +55,7 @@ class RawDoc:
     ref_text: str
     pages: int | None = None
     page_rects: list[tuple] | None = None
+    unknown_tags: dict[str, int] = field(default_factory=dict)   # §6.6, заполняет HTML
 
 
 @dataclass
@@ -63,6 +64,7 @@ class ReportDraft:
     oversize_blocks_split: int = 0
     structure_fallback: bool = False
     removed: dict = field(default_factory=dict)
+    unknown_tags: dict[str, int] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
 
 
