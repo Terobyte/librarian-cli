@@ -9,7 +9,7 @@ from lxml import etree
 _DECL = re.compile(rb"<\?xml[^>]*\?>", re.I)
 
 
-def _decode_html(data: bytes) -> str:
+def decode_html(data: bytes) -> str:
     """Декодируем bytes → str для lxml.html. Голые UTF-8-байты без объявления
     о кодировке lxml по эвристике ошибочно читает как Latin-1 (мошибейк на
     кириллице), поэтому декодируем сами: BOM → <?xml encoding=...?> → UTF-8.
@@ -40,4 +40,4 @@ def parse_xml(data: bytes) -> etree._Element:
 
 
 def parse_html(data: bytes) -> lxml.html.HtmlElement:
-    return lxml.html.document_fromstring(_decode_html(data), parser=html_parser())
+    return lxml.html.document_fromstring(decode_html(data), parser=html_parser())
