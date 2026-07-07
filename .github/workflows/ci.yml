@@ -1,0 +1,45 @@
+name: ci
+on: [push, pull_request]
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: тесты (сеть в тестах блокирует pytest-socket)
+        working-directory: librarian
+        run: |
+          uv sync --frozen
+          uv run pytest -q
+
+  wheel-offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5      # download/venv/install — одним и тем же
+        with:                              # интерпретатором, иначе теги платформенных
+          python-version: "3.11"           # колёс (pymupdf/lxml) не совпадут при
+      - uses: astral-sh/setup-uv@v5        # --no-index; 3.11 = пол матрицы §17.
+                                           # (uv build может взять managed-python —
+                                           # wheel py3-none-any, это не важно)
+      - name: собрать wheel и скачать зависимости (сеть ещё разрешена)
+        working-directory: librarian
+        run: |
+          uv build --wheel
+          python -m pip download -d /tmp/wheelhouse dist/*.whl
+      - name: установка и smoke строго офлайн (--no-index)
+        working-directory: librarian
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install --no-index --find-links /tmp/wheelhouse dist/*.whl
+          printf 'Глава 1\n\nТекст главы про море и маяк, длинный и спокойный.\n' > /tmp/kniga.txt
+          /tmp/clean/bin/lib --library /tmp/lib ingest /tmp/kniga.txt
+          /tmp/clean/bin/lib --library /tmp/lib list
