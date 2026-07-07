@@ -73,3 +73,22 @@ def apply_heading_patterns(paras: list[tuple[str, bool]], cfg: Config) -> list[B
         if r is not None else Block(BlockKind.PARA, text)
         for text, r in ranked
     ]
+
+
+def apply_patterns_to_blocks(blocks: list[Block], cfg: Config) -> list[Block]:
+    """§6.1.3 как общий fallback (§6.5 DOCX, §7.2 P5.5): PARA-блоки из одной
+    строки прогоняются через паттерны; ранги сжимаются в уровни 1..k."""
+    patterns = compile_patterns(cfg)
+    ranks: dict[int, int] = {}
+    for i, b in enumerate(blocks):
+        if b.kind is BlockKind.PARA and "\n" not in b.text:
+            r = line_rank(b.text, patterns)
+            if r is not None:
+                ranks[i] = r
+    level_of = {r: k + 1 for k, r in enumerate(sorted(set(ranks.values())))}
+    return [
+        Block(BlockKind.HEADING, b.text, level=level_of[ranks[i]],
+              origin=f"pattern:rank{ranks[i]}")
+        if i in ranks else b
+        for i, b in enumerate(blocks)
+    ]
