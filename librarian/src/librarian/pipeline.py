@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from librarian import PIPELINE_VERSION
-from librarian.catalog import find_by_cache_key, find_by_sha256, read_book, rebuild_index
+from librarian.catalog import (find_by_cache_key, find_by_sha256, read_book, rebuild_index, scan_books)
 from librarian.config import Config, config_hash
 from librarian.detect import detect
 from librarian.emit import (emit_book, lang_heuristic, library_lock,
@@ -44,15 +44,16 @@ def run_ingest(paths: list[Path], cfg: Config, lib_root: Path,
     return outcomes
 
 
-def _safe_ingest(path: Path, cfg: Config, lib_root: Path, force: bool) -> IngestOutcome:
+def _safe_ingest(path: Path, cfg: Config, lib_root: Path, force: bool,
+                 book_id: str | None = None) -> IngestOutcome:
     try:
-        return ingest_file(path, cfg, lib_root, force)
+        return ingest_file(path, cfg, lib_root, force, book_id=book_id)
     except DetectError as e:
-        return IngestOutcome(path, None, "skipped", None, str(e))
+        return IngestOutcome(path, book_id, "skipped", None, str(e))
     except LibError as e:
-        return IngestOutcome(path, None, "failed", None, str(e), traceback.format_exc())
+        return IngestOutcome(path, book_id, "failed", None, str(e), traceback.format_exc())
     except Exception as e:                          # noqa: BLE001 — §16: пакет не падает
-        return IngestOutcome(path, None, "failed", None,
+        return IngestOutcome(path, book_id, "failed", None,
                              f"{type(e).__name__}: {e}", traceback.format_exc())
 
 
@@ -76,7 +77,7 @@ def _extract_with_timeout(path: Path, fmt, cfg: Config):
 
 
 def ingest_file(path: Path, cfg: Config, lib_root: Path,
-                force: bool = False) -> IngestOutcome:
+                force: bool = False, book_id: str | None = None) -> IngestOutcome:
     size = path.stat().st_size                                           # 0 — лимит §6.0
     if size > cfg.limits.max_source_mb * 1024 * 1024:
         raise LimitError(f"{path.name}: файл {size // (1024 * 1024)} МБ "
@@ -111,8 +112,9 @@ def ingest_file(path: Path, cfg: Config, lib_root: Path,
     if status == "failed":                                               # 11
         reasons = "; ".join(triggers) if triggers else f"score {score}"
         print(f"{path.name}: failed ({reasons}) — книга не сохранена", file=sys.stderr)
-        return IngestOutcome(path, None, "failed", score, "score ниже порога")
-    book_id = _resolve_identity(path, raw, sha, lib_root, cfg)           # 12
+        return IngestOutcome(path, book_id, "failed", score, "score ниже порога")
+    if book_id is None:                                                  # 12: reingest знает id заранее (К-1)
+        book_id = _resolve_identity(path, raw, sha, lib_root, cfg)
     title, author, lang, locked = (raw.title or path.stem), (raw.author or ""), raw.lang, False
     try:
         prev = read_book(lib_root, book_id)
@@ -129,6 +131,25 @@ def ingest_file(path: Path, cfg: Config, lib_root: Path,
                     status=status, score=score, keep_source=cfg.keep_source)
     emit_book(meta, chapters, report, lib_root, cfg)                     # 13
     return IngestOutcome(path, book_id, status, score)                   # 15
+
+
+def run_reingest(cfg: Config, lib_root: Path) -> list[IngestOutcome]:
+    """§13: пересборка библиотеки из source/ текущим кодом/конфигом.
+    Совпавший cache_key → skipped (выход и так побайтово идентичен, §2)."""
+    outcomes: list[IngestOutcome] = []
+    with library_lock(lib_root, cfg.general.lock_timeout_s):
+        recover(lib_root)
+        for bid, book in scan_books(lib_root):
+            fname = book.get("source", {}).get("file")
+            src = lib_root / bid / "source" / fname if fname else None
+            if src is None or not src.is_file():
+                outcomes.append(IngestOutcome(
+                    lib_root / bid, bid, "skipped", None,
+                    "нет сохранённого исходника (--no-keep-source?)"))
+                continue
+            outcomes.append(_safe_ingest(src, cfg, lib_root, force=False, book_id=bid))
+        rebuild_index(lib_root)                    # один раз на команду (С-7)
+    return outcomes
 
 
 def _resolve_identity(path: Path, raw, sha: str, lib_root: Path, cfg: Config) -> str:

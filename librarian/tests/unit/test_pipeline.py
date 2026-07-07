@@ -139,3 +139,104 @@ def test_extract_timeout_enforcement(monkeypatch, tmp_path):
     with pytest.raises(LibError, match="извлечение зависло|timeout"):
         ingest_file(p, cfg, tmp_path / "lib")
 
+
+
+def _lib_with_book(tmp_path, monkeypatch):
+    from pathlib import Path
+    from librarian.config import load_config
+    from librarian.pipeline import run_ingest
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
+    fx = Path(__file__).parent.parent / "fixtures" / "txt" / "roman_cp1251.txt"
+    out = run_ingest([fx], load_config(None), tmp_path)[0]
+    return out.book_id
+
+
+def test_reingest_noop_when_cache_key_matches(tmp_path, monkeypatch):
+    from librarian.config import load_config
+    from librarian.pipeline import run_reingest
+    from conftest import tree_bytes
+    bid = _lib_with_book(tmp_path, monkeypatch)
+    before = tree_bytes(tmp_path)
+    outcomes = run_reingest(load_config(None), tmp_path)
+    assert [o.status for o in outcomes] == ["skipped"]
+    assert tree_bytes(tmp_path) == before                     # ни байта не изменилось
+
+
+def test_reingest_rebuilds_on_config_change_keeps_id(tmp_path, monkeypatch):
+    import json
+    from librarian.config import load_config
+    from librarian.pipeline import run_reingest
+    bid = _lib_with_book(tmp_path, monkeypatch)
+    bj = tmp_path / bid / "book.json"
+    hash_before = json.loads(bj.read_text(encoding="utf-8"))["provenance"]["config_hash"]
+    cfg_toml = tmp_path / "cfg.toml"
+    cfg_toml.write_text('[general]\npreface_title = "Пролог"\n', encoding="utf-8")
+    cfg = load_config(cfg_toml)                               # другой config_hash
+    outcomes = run_reingest(cfg, tmp_path)
+    assert [o.status for o in outcomes] == ["ok"]
+    assert outcomes[0].book_id == bid                         # К-1: id стабилен
+    book = json.loads(bj.read_text(encoding="utf-8"))
+    assert book["provenance"]["config_hash"] != hash_before   # новый cfg дошёл до provenance
+
+
+def test_reingest_preserves_meta_locked(tmp_path, monkeypatch):
+    # С-2: ручные правки title/author/lang переживают реингест
+    import json
+    from librarian.config import load_config
+    from librarian.pipeline import run_reingest
+    bid = _lib_with_book(tmp_path, monkeypatch)
+    bj = tmp_path / bid / "book.json"
+    book = json.loads(bj.read_text(encoding="utf-8"))
+    book["title"], book["meta_locked"] = "Моё название", True
+    bj.write_text(json.dumps(book, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+                  encoding="utf-8")
+    cfg_toml = tmp_path / "cfg.toml"
+    cfg_toml.write_text('[general]\npreface_title = "Пролог"\n', encoding="utf-8")
+    run_reingest(load_config(cfg_toml), tmp_path)
+    after = json.loads(bj.read_text(encoding="utf-8"))
+    assert after["title"] == "Моё название" and after["meta_locked"] is True
+
+
+def test_reingest_skips_book_without_source(tmp_path, monkeypatch):
+    import shutil
+    from librarian.config import load_config
+    from librarian.pipeline import run_reingest
+    bid = _lib_with_book(tmp_path, monkeypatch)
+    shutil.rmtree(tmp_path / bid / "source")
+    outcomes = run_reingest(load_config(None), tmp_path)
+    assert outcomes[0].status == "skipped"
+    assert "исходник" in outcomes[0].message
+
+
+def test_reingest_failed_book_keeps_id(tmp_path, monkeypatch):
+    # К-1, путь (a) — исключение: порча байтов source меняет sha → кэш мимо,
+    # detect() падает на PK-магии (BrokenFileError) → except-ветка _safe_ingest.
+    from librarian.config import load_config
+    from librarian.pipeline import run_reingest
+    bid = _lib_with_book(tmp_path, monkeypatch)
+    src = next((tmp_path / bid / "source").iterdir())
+    src.write_bytes(b"PK\x03\x04" + b"\x00" * 64)
+    outcomes = run_reingest(load_config(None), tmp_path)
+    assert outcomes[0].status == "failed"
+    assert outcomes[0].book_id == bid
+
+
+def test_reingest_failed_by_score_keeps_id(tmp_path, monkeypatch):
+    # К-1, путь (b) — failed по score, НЕ исключение: бьёт в ветку
+    # `if status == "failed"` внутри ingest_file (она правится отдельно от
+    # except-веток — оба пути обязаны сохранять id). Мусорный, но валидный
+    # utf-8 текст: garbage- и dehyphen-субоценки 0, структуры нет → score
+    # ≈ 0.525 < 0.60 (полный quality — M4).
+    from librarian.config import load_config
+    from librarian.pipeline import run_reingest
+    bid = _lib_with_book(tmp_path, monkeypatch)
+    src = next((tmp_path / bid / "source").iterdir())
+    src.write_text(
+        ("Обычная спокойная строка про море и маяк, ровная и достаточно длинная.\n\n"
+         "аб\n\n"
+         "и снова про море, но эта строка обрывается на самом инте-\n\n") * 60,
+        encoding="utf-8")
+    outcomes = run_reingest(load_config(None), tmp_path)
+    assert outcomes[0].status == "failed"
+    assert outcomes[0].score is not None and outcomes[0].score < 0.60
+    assert outcomes[0].book_id == bid

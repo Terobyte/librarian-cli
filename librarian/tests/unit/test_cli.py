@@ -272,3 +272,10 @@ def test_get_budget_first_chapter_too_big(tmp_path, monkeypatch):
     assert r.exit_code == 1 and r.stdout == ""                 # stdout не загрязняем
 
 
+
+
+def test_reingest_requires_all_flag(tmp_path):
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "reingest"])
+    assert r.exit_code == 2

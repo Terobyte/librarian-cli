@@ -13,7 +13,7 @@ from librarian.catalog import broken_dirs, read_book, rebuild_index, scan_books
 from librarian.config import load_config
 from librarian.emit import library_lock, recover
 from librarian.errors import LibError
-from librarian.pipeline import run_ingest
+from librarian.pipeline import run_ingest, run_reingest
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 _state: dict = {"library": None}
@@ -144,6 +144,32 @@ def get(book_id: str,
         sys.stdout.write("\n\n".join(t.rstrip("\n") for t in texts) + "\n")
     except (LibError, ValueError) as e:
         _err.print(str(e))
+        raise typer.Exit(1)
+
+
+@app.command()
+def reingest(all_: bool = typer.Option(False, "--all"),
+             config: Path | None = typer.Option(None, "--config"),
+             verbose: bool = typer.Option(False, "--verbose")) -> None:
+    if not all_:
+        _err.print("поддерживается только пакетный режим: lib reingest --all")
+        raise typer.Exit(2)
+    try:
+        cfg = load_config(config)
+    except LibError as e:
+        _err.print(str(e))
+        raise typer.Exit(1)
+    outcomes = run_reingest(cfg, _lib_root())
+    table = Table("id", "статус", "score")
+    for o in outcomes:
+        table.add_row(o.book_id or "—", o.status,
+                      f"{o.score:.2f}" if o.score is not None else "—")
+        if o.message:
+            _err.print(f"  {o.book_id}: {o.message}")
+        if verbose and o.traceback:
+            _err.print(o.traceback, markup=False, highlight=False, soft_wrap=True)
+    _err.print(table)
+    if any(o.status == "failed" for o in outcomes):
         raise typer.Exit(1)
 
 
