@@ -1,0 +1,13 @@
+{
+  "books": [
+    {
+      "author": "",
+      "chapters": 1,
+      "id": "kolonki3",
+      "status": "review",
+      "title": "kolonki3",
+      "total_tokens": 4217
+    }
+  ],
+  "pipeline_version": "2.3"
+}

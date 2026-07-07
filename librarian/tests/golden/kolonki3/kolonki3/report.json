@@ -1,0 +1,36 @@
+{
+  "config_hash": "1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+  "hard_triggers": [
+    "многоколоночная вёрстка (3+ колонки) на более чем 10% страниц"
+  ],
+  "metrics": {
+    "coverage": 0.8481,
+    "dehyphen_residue": 0.0,
+    "encoding_score": 0.0,
+    "garbage_ratio": 0.0,
+    "structure": 1.0
+  },
+  "multi_column_pages": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "oversize_blocks_split": 0,
+  "pages_flagged": [],
+  "pipeline_version": "2.3",
+  "removed": {},
+  "score": 1.0,
+  "status": "review",
+  "subscores": {
+    "coverage": 1.0,
+    "dehyphen": 1.0,
+    "encoding": 1.0,
+    "garbage": 1.0,
+    "structure": 1.0
+  },
+  "unknown_tags": {},
+  "warnings": []
+}

@@ -1,0 +1,32 @@
+{
+  "author": "",
+  "chapters": [
+    {
+      "file": "chapters/001-chapter-1.md",
+      "n": 1,
+      "summary": "The whale went south through heavy water and the shore slowly melted behind the fishing boats of the northern coast while the keeper wrote down every light he saw across the strait during the long night watch. The whale went south through heavy water and the shore slowly melted behind the fishing…",
+      "title": "Chapter 1",
+      "tokens": 4217
+    }
+  ],
+  "id": "kolonki3",
+  "lang": "en",
+  "meta_locked": false,
+  "provenance": {
+    "cache_key": "b04071158ab56340d80ab8bee5af6a67a577bd5cc970debf6fa37deb9979a01b:2.3:1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "config_hash": "1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "ingested_at": "1970-01-01T00:00:00Z",
+    "pipeline_version": "2.3"
+  },
+  "quality": {
+    "score": 1.0,
+    "status": "review"
+  },
+  "source": {
+    "file": "kolonki3.pdf",
+    "format": "pdf",
+    "sha256": "b04071158ab56340d80ab8bee5af6a67a577bd5cc970debf6fa37deb9979a01b"
+  },
+  "title": "kolonki3",
+  "total_tokens": 4217
+}

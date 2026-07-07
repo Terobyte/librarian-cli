@@ -1,0 +1,39 @@
+{
+  "author": "",
+  "chapters": [
+    {
+      "file": "chapters/001-volume-i.md",
+      "n": 1,
+      "summary": "The whale went south through heavy water and the shore slowly melted behind the fishing boats of the northern coast while the keeper wrote down every light he saw across the strait during the long night watch. The whale went south through heavy water and the shore slowly melted behind the fishing… — Chapter 1 · Chapter 2",
+      "title": "Volume I",
+      "tokens": 716
+    },
+    {
+      "file": "chapters/002-volume-ii.md",
+      "n": 2,
+      "summary": "The whale went south through heavy water and the shore slowly melted behind the fishing boats of the northern coast while the keeper wrote down every light he saw across the strait during the long night watch. The whale went south through heavy water and the shore slowly melted behind the fishing… — Chapter 3 · Chapter 4 · Chapter 5 · Chapter 6",
+      "title": "Volume II",
+      "tokens": 1428
+    }
+  ],
+  "id": "voyage",
+  "lang": "en",
+  "meta_locked": false,
+  "provenance": {
+    "cache_key": "76abea2796bc4796466694f3df4e21eaacd008af7d28c9c925a9e51725387082:2.3:1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "config_hash": "1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "ingested_at": "1970-01-01T00:00:00Z",
+    "pipeline_version": "2.3"
+  },
+  "quality": {
+    "score": 1.0,
+    "status": "ok"
+  },
+  "source": {
+    "file": "voyage.pdf",
+    "format": "pdf",
+    "sha256": "76abea2796bc4796466694f3df4e21eaacd008af7d28c9c925a9e51725387082"
+  },
+  "title": "voyage",
+  "total_tokens": 2144
+}

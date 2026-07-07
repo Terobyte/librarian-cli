@@ -1,0 +1,13 @@
+{
+  "books": [
+    {
+      "author": "",
+      "chapters": 2,
+      "id": "voyage",
+      "status": "ok",
+      "title": "voyage",
+      "total_tokens": 2144
+    }
+  ],
+  "pipeline_version": "2.3"
+}
