@@ -63,6 +63,8 @@ class ReportDraft:
     control_chars: int = 0
     oversize_blocks_split: int = 0
     structure_fallback: bool = False
+    pages_flagged: list[int] = field(default_factory=list)          # P4
+    multi_column_pages: list[int] = field(default_factory=list)     # P3 / С-11
     removed: dict = field(default_factory=dict)
     unknown_tags: dict[str, int] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
