@@ -13,7 +13,7 @@ dependencies = [
 lib = "librarian.cli:app"
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "pytest-socket>=0.7"]
 
 [build-system]
 requires = ["hatchling"]
@@ -24,3 +24,5 @@ packages = ["src/librarian"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--disable-socket --allow-unix-socket"
+markers = ["perf: перф-смоук (мягкий порог, §17)"]
