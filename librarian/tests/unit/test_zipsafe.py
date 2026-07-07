@@ -67,3 +67,27 @@ def test_read_entry_ok(tmp_path):
     p = tmp_path / "ok.zip"
     _make_zip(p, [("book.fb2", "текст".encode("utf-8"))])
     assert zipsafe.read_entry(p, "book.fb2", load_config(None)) == "текст".encode("utf-8")
+
+
+def test_encrypted_zip_raises_broken_file_error(tmp_path):
+    # BUG F-9: зашифрованная zip-запись -> сырой RuntimeError (не BrokenFileError)
+    # Python's ZipFile.writestr drops flag_bits, so we patch the raw bytes.
+    p = tmp_path / "encrypted.zip"
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("secret.txt", b"secret content")
+
+    # Patch encryption bit in local file header (offset 6) and central dir
+    raw = bytearray(p.read_bytes())
+    # Local file header: PK\x03\x04 at offset 0, flag_bits at offset 6
+    loc = raw.index(b"PK\x03\x04")
+    raw[loc + 6] |= 0x01
+    # Central directory header: PK\x01\x02, flag_bits at offset 8
+    cdir = raw.index(b"PK\x01\x02")
+    raw[cdir + 8] |= 0x01
+    p.write_bytes(bytes(raw))
+
+    with pytest.raises(BrokenFileError, match="зашифрованная запись|encrypted"):
+        zipsafe.check_zip(p, load_config(None))
+
+    with pytest.raises(BrokenFileError, match="зашифрованная запись|encrypted"):
+        zipsafe.read_entry(p, "secret.txt", load_config(None))

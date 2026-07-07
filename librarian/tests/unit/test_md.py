@@ -55,3 +55,27 @@ def test_md_thematic_break_not_setext(tmp_path):
 def test_md_setext_dash(tmp_path):
     raw = _extract(tmp_path, "Название\n---\n\nтело")
     assert (raw.blocks[0].kind, raw.blocks[0].level) == (BlockKind.HEADING, 2)
+
+
+def test_md_fallback_retains_hierarchy(tmp_path):
+    # BUG F-5: MD fallback сплющивает иерархию заголовков в level=1
+    text = "Том 1\n\nГлава первая\n\nТекст.\n\nГлава вторая\n\nЕщё."
+    raw = _extract(tmp_path, text)
+    headings = [b for b in raw.blocks if b.kind is BlockKind.HEADING]
+    assert len(headings) == 3
+    assert headings[0].text == "Том 1"
+    assert headings[0].level == 1
+    assert headings[1].text == "Глава первая"
+    assert headings[1].level == 2
+    assert headings[2].text == "Глава вторая"
+    assert headings[2].level == 2
+
+
+def test_md_code_block_fence_prefix_safety(tmp_path):
+    # BUG F-6: MD fence закрывается по префиксу, теряя контент code-блока
+    text = "```\ncode line\n```text\nmore code\n```"
+    raw = _extract(tmp_path, text)
+    assert len(raw.blocks) == 1
+    assert raw.blocks[0].kind is BlockKind.CODE
+    assert raw.blocks[0].text == "code line\n```text\nmore code"
+

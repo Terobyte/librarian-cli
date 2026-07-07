@@ -152,11 +152,20 @@ def load_config(path: Path | None = None, *, keep_source: bool = True) -> Config
         unknown = sorted(set(section) - known)
         if unknown:
             raise LibError(f"неизвестные ключи в [{name}]: {', '.join(unknown)}")
+        # dict-поля: partial-override мёрджим с дефолтами (§14 overlay-семантика)
+        if name == "quality" and "weights" in section:
+            merged_w = _default_weights()
+            merged_w.update(section["weights"])
+            section["weights"] = merged_w
+        if name == "chapters" and "patterns" in section:
+            merged_p = _default_patterns()
+            merged_p.update({k: tuple(v) for k, v in section["patterns"].items()})
+            section["patterns"] = merged_p
         # tuple-поля: TOML отдаёт list — приводим для frozen-каноничности
         for f in dataclasses.fields(cls):
             if f.name in section and isinstance(section[f.name], list):
                 section[f.name] = tuple(section[f.name])
-            if f.name == "patterns" and f.name in section:
+            if f.name == "patterns" and f.name in section and not isinstance(section[f.name], dict):
                 section[f.name] = {k: tuple(v) for k, v in sorted(section[f.name].items())}
         kwargs[name] = cls(**section)
     return Config(**kwargs)

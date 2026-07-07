@@ -10,6 +10,9 @@ from librarian.extractors import base
 from librarian.extractors.textrules import apply_heading_patterns, merge_lines
 from librarian.ir import Format, RawDoc
 
+import re
+_PARA_SEP = re.compile(r"\n[ \t]*\n")
+
 # Кодировки, способные дать кириллицу — для fallback-аудита при моёбаке.
 _CYR_ENCODINGS = ("utf-8", "cp1251", "koi8-r", "cp866", "maccyrillic", "iso8859-5")
 _VOWELS = frozenset("аеёиоуыэюя")
@@ -61,7 +64,7 @@ class TxtExtractor:
     def extract(self, path: Path, cfg: Config) -> RawDoc:
         text = _read_text(path.read_bytes(), path.name)
         paras: list[tuple[str, bool]] = []
-        for chunk in text.replace("\r\n", "\n").replace("\r", "\n").split("\n\n"):
+        for chunk in _PARA_SEP.split(text.replace("\r\n", "\n").replace("\r", "\n")):
             lines = [ln for ln in chunk.split("\n") if ln.strip()]
             if lines:
                 paras.append((merge_lines(lines, cfg), len(lines) == 1))

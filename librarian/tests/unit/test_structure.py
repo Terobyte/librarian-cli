@@ -48,3 +48,20 @@ def test_fallback_parts():
     assert len(chapters) >= 2
     assert chapters[0].title == f"Роман (1/{len(chapters)})"
     assert sum(len(c.blocks) for c in chapters) == 10
+
+
+def test_normalize_heading_levels_none_level():
+    # BUG F-12: normalize_heading_levels падает на HEADING с level=None
+    blocks = [
+        Block(BlockKind.HEADING, "Заголовок 1", level=None),
+        Block(BlockKind.HEADING, "Заголовок 2", level=2),
+    ]
+    out = normalize_heading_levels(blocks)
+    assert len(out) == 2
+    # Проверяем, что HEADING-блоки получили числовые уровни
+    assert all(b.level is not None for b in out if b.kind is BlockKind.HEADING)
+    # Проверяем, что дерево строится без крашей
+    root = build_tree(out, CFG)
+    assert len(root.children) > 0
+
+

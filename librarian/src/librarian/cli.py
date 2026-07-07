@@ -95,19 +95,25 @@ def list_cmd(book_id: str = typer.Argument(None)) -> None:
                 t.add_row(str(ch["n"]), ch["title"], str(ch["tokens"]),
                           (ch["summary"] or "")[:80])
             out.print(t)
-    except LibError as e:
-        _err.print(str(e))
+    except (LibError, KeyError, ValueError) as e:
+        _err.print(f"индекс библиотеки повреждён: {e}")
         raise typer.Exit(1)
 
 
 @app.command()
 def get(book_id: str, spec: str) -> None:
     try:
-        book = read_book(_lib_root(), book_id)
+        lib = _lib_root()
+        book = read_book(lib, book_id)
         nums = parse_spec(spec, len(book["chapters"]))
         by_n = {ch["n"]: ch for ch in book["chapters"]}
-        texts = [(_lib_root() / book_id / by_n[n]["file"])
-                 .read_text(encoding="utf-8") for n in nums]
+        texts: list[str] = []
+        book_dir = (lib / book_id).resolve()
+        for n in nums:
+            ch_path = (lib / book_id / by_n[n]["file"]).resolve()
+            if not ch_path.is_relative_to(book_dir):
+                raise LibError(f"недопустимый путь главы: {by_n[n]['file']}")
+            texts.append(ch_path.read_text(encoding="utf-8"))
         sys.stdout.write("\n\n".join(t.rstrip("\n") for t in texts) + "\n")
     except (LibError, ValueError) as e:
         _err.print(str(e))

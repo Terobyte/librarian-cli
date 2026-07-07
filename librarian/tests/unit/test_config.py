@@ -22,3 +22,24 @@ def test_hash_stable_and_sensitive(tmp_path):
     h1, h2 = config_hash(Config()), config_hash(Config())
     assert h1 == h2 and len(h1) == 64
     assert config_hash(load_config(None, keep_source=False)) != h1
+
+
+def test_config_quality_weights_partial_override(tmp_path):
+    # BUG F-3: Частичное переопределение [quality.weights] теряет остальные дефолт-веса
+    p = tmp_path / "config.toml"
+    p.write_text("[quality.weights]\ncoverage = 0.5\n", encoding="utf-8")
+    cfg = load_config(p)
+    assert "structure" in cfg.quality.weights
+    assert cfg.quality.weights["coverage"] == 0.5
+    assert cfg.quality.weights["structure"] == 0.25
+
+
+def test_config_patterns_partial_override(tmp_path):
+    # BUG F-8: [chapters.patterns] overlay заменяет словарь целиком
+    p = tmp_path / "config.toml"
+    p.write_text("[chapters.patterns]\nrank1 = [\"^том\"]\n", encoding="utf-8")
+    cfg = load_config(p)
+    assert "rank3" in cfg.chapters.patterns
+    assert cfg.chapters.patterns["rank1"] == ("^том",)
+    assert len(cfg.chapters.patterns["rank3"]) > 0
+

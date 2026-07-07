@@ -83,3 +83,43 @@ def test_source_size_limit(tmp_path):
     assert outcomes[0].status == "failed"
     assert "больше лимита" in outcomes[0].message
     assert not (tmp_path / "lib" / "big").exists()
+
+
+def test_extract_timeout_enforcement(monkeypatch, tmp_path):
+    # BUG F-10: extract_timeout_s объявлен, но не применяется
+    import time
+    import pytest
+    from librarian.ir import Format
+    from librarian.extractors.base import EXTRACTORS
+    from librarian.pipeline import ingest_file
+    from librarian.config import load_config, LimitsCfg
+    from librarian.errors import LibError
+    import dataclasses
+
+    orig_txt_extractor = EXTRACTORS[Format.TXT]
+
+    class SlowExtractor:
+        format = Format.TXT
+        def extract(self, path, cfg):
+            time.sleep(2.0)
+            return orig_txt_extractor.extract(path, cfg)
+
+    monkeypatch.setitem(EXTRACTORS, Format.TXT, SlowExtractor())
+
+    cfg = load_config(None)
+    cfg = dataclasses.replace(
+        cfg,
+        limits=LimitsCfg(
+            max_source_mb=cfg.limits.max_source_mb,
+            zip_max_uncompressed_mb=cfg.limits.zip_max_uncompressed_mb,
+            zip_ratio_max=cfg.limits.zip_ratio_max,
+            extract_timeout_s=1
+        )
+    )
+
+    p = tmp_path / "note.txt"
+    p.write_text("Глава 1\n\nНекоторый текст.", encoding="utf-8")
+
+    with pytest.raises(LibError, match="извлечение зависло|timeout"):
+        ingest_file(p, cfg, tmp_path / "lib")
+

@@ -47,3 +47,32 @@ def test_pipeline_numbering():
     out = apply_section_passes(chs, _ctx())
     assert [c.n for c in out] == [1, 2]
 
+
+def test_r2_toc_does_not_drop_self_repeating_chapter():
+    # BUG F-2: R2 (TOC) ложно удаляет главу, тело которой повторяет её собственный заголовок
+    ctx = _ctx()
+    ctx.raw.blocks = [
+        Block(BlockKind.HEADING, "Вступление", level=1)
+    ]
+    
+    ch = Chapter(0, "Часть первая · Вступление", [
+        Block(BlockKind.HEADING, "Вступление", level=1),
+        Block(BlockKind.PARA, "Вступление\nВступление\nВступление\nВступление")
+    ])
+    
+    from librarian.passes.sections import r2_toc
+    out = r2_toc([ch], ctx)
+    assert len(out) == 1
+
+
+def test_force_split_no_boundaries():
+    # BUG F-11: R4.3 _force_split не режет блок без границ предложений/строк
+    from librarian.passes.sections import _force_split
+    b = Block(BlockKind.PARA, "слово " * 5000)
+    out = _force_split(b, 2000)
+    assert len(out) > 1
+    from librarian.tokens import block_tokens
+    for part in out:
+        assert block_tokens(part) <= 2000
+
+

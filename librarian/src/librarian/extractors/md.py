@@ -5,7 +5,7 @@ from pathlib import Path
 
 from librarian.config import Config
 from librarian.extractors import base
-from librarian.extractors.textrules import apply_heading_patterns, merge_lines
+from librarian.extractors.textrules import apply_heading_patterns, apply_patterns_to_blocks, merge_lines
 from librarian.extractors.txt import _read_text
 from librarian.ir import Block, BlockKind, Format, RawDoc
 
@@ -41,13 +41,7 @@ class MdExtractor:
 
 
 def _fallback_patterns(blocks: list[Block], cfg: Config) -> list[Block]:
-    out: list[Block] = []
-    for b in blocks:
-        if b.kind is BlockKind.PARA and "\n" not in b.text:
-            out.extend(apply_heading_patterns([(b.text, True)], cfg))
-        else:
-            out.append(b)
-    return out
+    return apply_patterns_to_blocks(blocks, cfg)
 
 
 def _parse(text: str, cfg: Config) -> list[Block]:
@@ -74,9 +68,14 @@ def _parse(text: str, cfg: Config) -> list[Block]:
         m = _FENCE.match(stripped)
         if m:
             flush()
-            fence, body = m.group(1), []
+            fence_ticks = m.group(1)            # голые бэктики (```, ````, …)
+            body = []
             i += 1
-            while i < len(lines) and not lines[i].strip().startswith(fence):
+            while i < len(lines):
+                s = lines[i].strip()
+                # CommonMark: закрывающий fence — только бэктики, длина ≥ opening
+                if s and all(c == '`' for c in s) and len(s) >= len(fence_ticks):
+                    break
                 body.append(lines[i])
                 i += 1
             blocks.append(Block(BlockKind.CODE, "\n".join(body), origin="fence"))

@@ -122,3 +122,73 @@ def test_rm_path_traversal_protection(lib):
     import shutil
     shutil.rmtree(sibling, ignore_errors=True)
 
+
+def test_get_path_traversal_protection(lib, tmp_path):
+    # BUG F-1: path traversal в get через book.json:file
+    lib_dir, bid = lib
+    
+    # 1. Секретный файл внутри библиотеки (но вне папки книги)
+    secret_file = lib_dir / "secret.txt"
+    secret_file.write_text("TOP SECRET CONTENT", encoding="utf-8")
+    
+    # 2. Секретный файл полностью за пределами корня библиотеки
+    outside_file = tmp_path / "outside.txt"
+    outside_file.write_text("OUTSIDE SECRET CONTENT", encoding="utf-8")
+    
+    evil_dir = lib_dir / "evil-book"
+    evil_dir.mkdir(exist_ok=True)
+    
+    import json
+    evil_book_json = {
+        "id": "evil-book",
+        "title": "Evil Book",
+        "author": "Author",
+        "chapters": [
+            {
+                "n": 1,
+                "title": "Chapter 1",
+                "tokens": 10,
+                "file": "../secret.txt",
+                "summary": "Traversing paths"
+            },
+            {
+                "n": 2,
+                "title": "Chapter 2",
+                "tokens": 10,
+                "file": "../../outside.txt",
+                "summary": "Traversing paths outside"
+            }
+        ]
+    }
+    (evil_dir / "book.json").write_text(json.dumps(evil_book_json), encoding="utf-8")
+    
+    # Проверка 1: подъем на уровень вверх
+    r1 = runner.invoke(app, ["--library", str(lib_dir), "get", "evil-book", "1"])
+    assert r1.exit_code == 1
+    assert "TOP SECRET CONTENT" not in r1.stdout
+    assert "недопустимый" in r1.stderr or "ошибка" in r1.stderr or r1.exit_code == 1
+    
+    # Проверка 2: подъем полностью за пределы библиотеки
+    r2 = runner.invoke(app, ["--library", str(lib_dir), "get", "evil-book", "2"])
+    assert r2.exit_code == 1
+    assert "OUTSIDE SECRET CONTENT" not in r2.stdout
+
+
+
+def test_list_corrupted_index_json(tmp_path):
+    # BUG F-7: lib list роняет сырой traceback на битом index.json
+    lib_dir = tmp_path / "lib"
+    lib_dir.mkdir()
+    
+    (lib_dir / "index.json").write_text("invalid json {", encoding="utf-8")
+    r1 = runner.invoke(app, ["--library", str(lib_dir), "list"])
+    assert r1.exit_code == 1
+    # Должен быть чистый exit (SystemExit), без сырого traceback
+    assert isinstance(r1.exception, SystemExit)
+    
+    (lib_dir / "index.json").write_text('{"other": []}', encoding="utf-8")
+    r2 = runner.invoke(app, ["--library", str(lib_dir), "list"])
+    assert r2.exit_code == 1
+    assert isinstance(r2.exception, SystemExit)
+
+

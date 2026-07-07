@@ -56,6 +56,25 @@ def _safe_ingest(path: Path, cfg: Config, lib_root: Path, force: bool) -> Ingest
                              f"{type(e).__name__}: {e}", traceback.format_exc())
 
 
+def _extract_with_timeout(path: Path, fmt, cfg: Config):
+    """Обёртка §6.0: extract_timeout_s через signal.alarm (POSIX)."""
+    import signal
+    timeout = cfg.limits.extract_timeout_s
+    if not hasattr(signal, "SIGALRM") or timeout <= 0:
+        return get_extractor(fmt).extract(path, cfg)
+
+    def _alarm_handler(signum, frame):
+        raise LimitError(f"{path.name}: извлечение зависло (таймаут {timeout}с)")
+
+    old = signal.signal(signal.SIGALRM, _alarm_handler)
+    signal.alarm(timeout)
+    try:
+        return get_extractor(fmt).extract(path, cfg)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old)
+
+
 def ingest_file(path: Path, cfg: Config, lib_root: Path,
                 force: bool = False) -> IngestOutcome:
     size = path.stat().st_size                                           # 0 — лимит §6.0
@@ -70,7 +89,7 @@ def ingest_file(path: Path, cfg: Config, lib_root: Path,
         existing = find_by_cache_key(lib_root, cache_key)
         if existing:
             return IngestOutcome(path, existing, "skipped", None, "уже в библиотеке")
-    raw = get_extractor(fmt).extract(path, cfg)                          # 4
+    raw = _extract_with_timeout(path, fmt, cfg)                          # 4
     ctx = DocContext(fmt, cfg, raw,
                      ReportDraft(unknown_tags=dict(raw.unknown_tags)))         # 5
     blocks = apply_block_passes(raw.blocks, ctx)                         # 6

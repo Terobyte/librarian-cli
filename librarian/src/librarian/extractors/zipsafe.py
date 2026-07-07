@@ -18,6 +18,11 @@ def check_zip(path: Path, cfg: Config) -> None:
     try:
         with zipfile.ZipFile(path) as z:
             infos = z.infolist()
+            # F-9: зашифрованные записи — до попытки открытия
+            encrypted = [i for i in infos if i.flag_bits & 0x1]
+            if encrypted:
+                raise BrokenFileError(
+                    f"{path.name}: зашифрованная запись: {encrypted[0].filename}")
             declared = sum(i.file_size for i in infos)
             compressed = max(1, sum(i.compress_size for i in infos))
             if declared > max_total or declared / compressed > cfg.limits.zip_ratio_max:
@@ -31,6 +36,8 @@ def check_zip(path: Path, cfg: Config) -> None:
                             raise BrokenFileError(f"{path.name}: похоже на zip-bomb")
     except zipfile.BadZipFile as e:
         raise BrokenFileError(f"{path.name}: битый zip: {e}") from None
+    except RuntimeError as e:
+        raise BrokenFileError(f"{path.name}: {e}") from None
 
 
 def read_entry(path: Path, name: str, cfg: Config) -> bytes:
@@ -38,13 +45,20 @@ def read_entry(path: Path, name: str, cfg: Config) -> bytes:
     max_total = cfg.limits.zip_max_uncompressed_mb * 1024 * 1024
     out = bytearray()
     try:
-        with zipfile.ZipFile(path) as z, z.open(name) as f:
-            while chunk := f.read(_CHUNK):
-                out += chunk
-                if len(out) > max_total:
-                    raise BrokenFileError(f"{path.name}: похоже на zip-bomb")
+        with zipfile.ZipFile(path) as z:
+            info = z.getinfo(name)
+            if info.flag_bits & 0x1:
+                raise BrokenFileError(
+                    f"{path.name}: зашифрованная запись: {name}")
+            with z.open(info) as f:
+                while chunk := f.read(_CHUNK):
+                    out += chunk
+                    if len(out) > max_total:
+                        raise BrokenFileError(f"{path.name}: похоже на zip-bomb")
     except zipfile.BadZipFile as e:
         raise BrokenFileError(f"{path.name}: битый zip: {e}") from None
     except KeyError:
         raise BrokenFileError(f"{path.name}: в архиве нет записи {name}") from None
+    except RuntimeError as e:
+        raise BrokenFileError(f"{path.name}: {e}") from None
     return bytes(out)

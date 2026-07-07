@@ -1,3 +1,4 @@
+import pytest
 from librarian.config import Config
 from librarian.ir import Chapter, DocContext, Format, RawDoc, ReportDraft
 from librarian.quality import build_report, compute_metrics, score_and_status
@@ -55,3 +56,20 @@ def test_report_unknown_tags_only_when_present():
     ctx.report.unknown_tags["graphic"] = 2
     rep = build_report(ctx, m, subs, trig, score, status, cfg)
     assert rep["unknown_tags"] == {"graphic": 2}
+
+
+@pytest.mark.xfail(reason="out of scope M1 (M4 features)", strict=False)
+def test_report_has_required_m4_pdf_fields():
+    # BUG F-13: report.json без обязательных полей pages_flagged и multi_column_pages (вне scope — этап M4)
+    import pytest
+    from librarian.quality import build_report, compute_metrics, score_and_status
+    from librarian.config import Config
+    
+    ctx = _ctx()
+    m = compute_metrics(_chapters([1000]), ctx)
+    score, status, subs, trig = score_and_status(m, Config())
+    rep = build_report(ctx, m, subs, trig, score, status, Config())
+    
+    assert "pages_flagged" in rep
+    assert "multi_column_pages" in rep
+

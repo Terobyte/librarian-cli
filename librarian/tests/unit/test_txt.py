@@ -40,3 +40,17 @@ def test_txt_rank_compression(tmp_path):
     p.write_text("Глава 1\n\nТекст.\n\nГлава 2\n\nЕщё.", encoding="utf-8")
     raw = TxtExtractor().extract(p, Config())
     assert [b.level for b in raw.blocks if b.kind is BlockKind.HEADING] == [1, 1]
+
+
+def test_txt_whitespace_only_paragraph_separator(tmp_path):
+    # BUG F-4: TXT: разделитель абзацев игнорирует whitespace-only строки
+    p = tmp_path / "whitespace.txt"
+    text = "Параграф 1\n   \nПараграф 2\n\t\nПараграф 3"
+    p.write_text(text, encoding="utf-8")
+    
+    raw = TxtExtractor().extract(p, Config())
+    assert len(raw.blocks) == 3
+    assert raw.blocks[0].text == "Параграф 1"
+    assert raw.blocks[1].text == "Параграф 2"
+    assert raw.blocks[2].text == "Параграф 3"
+

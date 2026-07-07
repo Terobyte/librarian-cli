@@ -50,7 +50,10 @@ def r2_toc(chapters: list[Chapter], ctx: DocContext) -> list[Chapter]:
         if tokens > cfg.toc_max_tokens or not lines:
             kept.append(ch)
             continue
-        others = headings - {_canon(ch.title)}          # заголовки ДРУГИХ глав
+        # Вычитаем ВСЕ сегменты path-title главы (F-2: ch.title — путь «Часть · Глава»,
+        # а headings содержит сырые тексты вроде «Глава»)
+        own = {_canon(seg) for seg in ch.title.split(" · ")}
+        others = headings - own                          # заголовки ДРУГИХ глав
         numeric = sum(1 for ln in lines if ln.rstrip()[-1:].isdigit())
         dup = sum(1 for ln in lines if _canon(ln) in others)
         if (numeric / len(lines) > cfg.toc_numeric_line_ratio
@@ -165,10 +168,14 @@ def _force_split(b: Block, target: int) -> list[Block]:
     else:
         units = _SENT_SPLIT.split(b.text)
         glue = " "
+    from librarian.tokens import count
+    # Если единственный юнит (нет границ) — фолбэк на пословный разрез
+    if len(units) == 1 and count(units[0]) > target:
+        units = b.text.split()
+        glue = " "
     out: list[Block] = []
     cur: list[str] = []
     cur_tokens = 0
-    from librarian.tokens import count
     for u in units:
         t = count(u)
         if cur and cur_tokens + t > target:

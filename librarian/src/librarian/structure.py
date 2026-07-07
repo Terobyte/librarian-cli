@@ -8,11 +8,13 @@ from librarian.tokens import draft_count
 
 
 def normalize_heading_levels(blocks: list[Block]) -> list[Block]:
-    levels = sorted({b.level for b in blocks if b.kind is BlockKind.HEADING})
+    levels = sorted({b.level for b in blocks
+                     if b.kind is BlockKind.HEADING and b.level is not None})
     remap = {lvl: i + 1 for i, lvl in enumerate(levels)}
+    fallback = len(levels) + 1                       # для HEADING(level=None)
     for b in blocks:
         if b.kind is BlockKind.HEADING:
-            b.level = remap[b.level]
+            b.level = remap.get(b.level, fallback)
     return blocks
 
 
