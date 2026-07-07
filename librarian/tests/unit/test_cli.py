@@ -91,23 +91,6 @@ def test_ingest_bad_config(tmp_path):
     assert "конфиг" in r2.stderr
 
 
-@pytest.mark.xfail(reason="--budget/--from — фича M5 по §18, в M1 не реализована", strict=False)
-def test_get_budget_spec_conflict(lib):
-    lib_dir, bid = lib
-    # BUG 5: spec и --budget взаимоисключающие, должны выдавать exit 2
-    r = runner.invoke(app, ["--library", str(lib_dir), "get", bid, "1-2", "--budget", "12000"])
-    assert r.exit_code == 2
-
-
-@pytest.mark.xfail(reason="--budget/--from — фича M5 по §18, в M1 не реализована", strict=False)
-def test_get_budget_and_from_options(lib):
-    # BUG 5: get должен принимать --budget и --from
-    lib_dir, bid = lib
-    r = runner.invoke(app, ["--library", str(lib_dir), "get", bid, "--budget", "12000", "--from", "1"])
-    # не должно быть ошибки разбора опций (exit 2)
-    assert r.exit_code != 2
-
-
 def test_rm_path_traversal_protection(lib):
     # BUG 10: rm не должен принимать произвольные book_id с path traversal
     lib_dir, bid = lib
@@ -214,5 +197,78 @@ def test_doctor_unknown_id_exits_1(tmp_path):
     from librarian.cli import app
     r = CliRunner().invoke(app, ["--library", str(tmp_path), "doctor", "net-takoy"])
     assert r.exit_code == 1
+
+
+def _mklib(tmp_path, monkeypatch):
+    """Библиотека из инлайн-книги на 4 плоских «Глава N».
+    roman_cp1251.txt НЕ годится: резак §8 берёт уровень «Том» → всего 2 главы
+    (см. golden/roman_cp1251/index.json), а budget-тестам нужно ≥ 3."""
+    from librarian.config import load_config
+    from librarian.pipeline import run_ingest
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
+    src_dir = tmp_path / "_src"
+    src_dir.mkdir(exist_ok=True)
+    src = src_dir / "chetyre_glavy.txt"
+    src.write_text("".join(
+        f"Глава {n}\n\n"
+        + f"Ровный спокойный абзац главы номер {n} про море и маяк. " * 12
+        + "\n\n"
+        for n in range(1, 5)), encoding="utf-8")
+    out = run_ingest([src], load_config(None), tmp_path)[0]
+    assert out.status == "ok" and out.book_id, out.message
+    return out.book_id
+
+
+def test_get_spec_and_budget_mutually_exclusive(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    bid = _mklib(tmp_path, monkeypatch)
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "get", bid,
+                                 "1", "--budget", "1000"])
+    assert r.exit_code == 2
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "get", bid])
+    assert r.exit_code == 2                                    # ни spec, ни budget
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "get", bid,
+                                 "1", "--from", "2"])
+    assert r.exit_code == 2                                    # --from только с --budget
+
+
+def test_get_budget_greedy_consecutive(tmp_path, monkeypatch):
+    import json
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    bid = _mklib(tmp_path, monkeypatch)
+    book = json.loads((tmp_path / bid / "book.json").read_text(encoding="utf-8"))
+    toks = [c["tokens"] for c in book["chapters"]]
+    budget = toks[0] + toks[1]                                 # ровно первые две
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "get", bid,
+                                 "--budget", str(budget)])
+    assert r.exit_code == 0
+    assert book["chapters"][0]["title"] in r.stdout
+    assert book["chapters"][1]["title"] in r.stdout
+    assert book["chapters"][2]["title"] not in r.stdout
+
+
+def test_get_budget_from_k(tmp_path, monkeypatch):
+    import json
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    bid = _mklib(tmp_path, monkeypatch)
+    book = json.loads((tmp_path / bid / "book.json").read_text(encoding="utf-8"))
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "get", bid,
+                                 "--budget", str(book["chapters"][2]["tokens"]),
+                                 "--from", "3"])
+    assert r.exit_code == 0
+    assert book["chapters"][2]["title"] in r.stdout
+    assert book["chapters"][0]["title"] not in r.stdout
+
+
+def test_get_budget_first_chapter_too_big(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    bid = _mklib(tmp_path, monkeypatch)
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "get", bid,
+                                 "--budget", "1"])
+    assert r.exit_code == 1 and r.stdout == ""                 # stdout не загрязняем
 
 

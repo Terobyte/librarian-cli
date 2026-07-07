@@ -101,14 +101,41 @@ def list_cmd(book_id: str = typer.Argument(None)) -> None:
 
 
 @app.command()
-def get(book_id: str, spec: str) -> None:
+def get(book_id: str,
+        spec: str = typer.Argument(None),
+        budget: int = typer.Option(None, "--budget", help="лимит токенов"),
+        from_: int = typer.Option(1, "--from", help="первая глава для --budget")) -> None:
+    if (spec is None) == (budget is None):                    # §15: ровно одно из двух
+        _err.print("нужно ровно одно из: <spec> или --budget")
+        raise typer.Exit(2)
+    if spec is not None and from_ != 1:                       # молчаливый игнор — ловушка
+        _err.print("--from работает только вместе с --budget")
+        raise typer.Exit(2)
     try:
         lib = _lib_root()
         book = read_book(lib, book_id)
-        nums = parse_spec(spec, len(book["chapters"]))
-        by_n = {ch["n"]: ch for ch in book["chapters"]}
-        texts: list[str] = []
+        chaps = sorted(book["chapters"], key=lambda c: c["n"])
+        if spec is not None:
+            nums = parse_spec(spec, len(chaps))
+        else:
+            if not 1 <= from_ <= len(chaps):
+                raise ValueError(f"--from {from_} вне 1..{len(chaps)}")
+            nums, total = [], 0
+            for ch in chaps[from_ - 1:]:
+                if total + ch["tokens"] > budget:
+                    break
+                nums.append(ch["n"])
+                total += ch["tokens"]
+            if not nums:
+                raise ValueError(
+                    f"глава {from_} ({chaps[from_ - 1]['tokens']} токенов) "
+                    f"не влезает в бюджет {budget}")
+            if from_ - 1 + len(nums) < len(chaps):
+                first_skipped = chaps[from_ - 1 + len(nums)]["n"]
+                _err.print(f"не вошли в бюджет: главы {first_skipped}–{chaps[-1]['n']}")
+        by_n = {ch["n"]: ch for ch in chaps}
         book_dir = (lib / book_id).resolve()
+        texts: list[str] = []
         for n in nums:
             ch_path = (lib / book_id / by_n[n]["file"]).resolve()
             if not ch_path.is_relative_to(book_dir):
