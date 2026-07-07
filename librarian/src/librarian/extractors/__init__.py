@@ -4,3 +4,4 @@ from librarian.extractors import fb2   # noqa: F401  (регистрация в 
 from librarian.extractors import epub  # noqa: F401  (регистрация в EXTRACTORS)
 from librarian.extractors import docx  # noqa: F401  (регистрация в EXTRACTORS)
 from librarian.extractors import html  # noqa: F401  (регистрация в EXTRACTORS)
+from librarian.extractors import pdf   # noqa: F401  (регистрация в EXTRACTORS)
