@@ -101,44 +101,15 @@ def test_source_size_limit(tmp_path):
     assert not (tmp_path / "lib" / "big").exists()
 
 
-def test_extract_timeout_enforcement(monkeypatch, tmp_path):
-    # BUG F-10: extract_timeout_s объявлен, но не применяется
-    import time
-    import pytest
-    from librarian.ir import Format
-    from librarian.extractors.base import EXTRACTORS
-    from librarian.pipeline import ingest_file
-    from librarian.config import load_config, LimitsCfg
-    from librarian.errors import LibError
-    import dataclasses
-
-    orig_txt_extractor = EXTRACTORS[Format.TXT]
-
-    class SlowExtractor:
-        format = Format.TXT
-        def extract(self, path, cfg):
-            time.sleep(2.0)
-            return orig_txt_extractor.extract(path, cfg)
-
-    monkeypatch.setitem(EXTRACTORS, Format.TXT, SlowExtractor())
-
-    cfg = load_config(None)
-    cfg = dataclasses.replace(
-        cfg,
-        limits=LimitsCfg(
-            max_source_mb=cfg.limits.max_source_mb,
-            zip_max_uncompressed_mb=cfg.limits.zip_max_uncompressed_mb,
-            zip_ratio_max=cfg.limits.zip_ratio_max,
-            extract_timeout_s=1
-        )
-    )
-
-    p = tmp_path / "note.txt"
-    p.write_text("Глава 1\n\nНекоторый текст.", encoding="utf-8")
-
-    with pytest.raises(LibError, match="извлечение зависло|timeout"):
-        ingest_file(p, cfg, tmp_path / "lib")
-
+# test_extract_timeout_enforcement (BUG F-10) удалён в M5 Task 3 (откл. 35):
+# он monkeypatch-ил EXTRACTORS in-process под старый signal.alarm-механизм.
+# Тот механизм заменён spawn-guard-ом — monkeypatch не пересекает границу
+# процесса, а conftest гоняет extract inprocess. Таймаут §6.0 теперь покрыт
+# unit/test_guard.py::test_timeout_kills_child (kill + LimitError) и
+# test_guarded_extract_end_to_end. Путь «LimitError → outcome failed» —
+# test_source_size_limit (LimitError < ExtractError < LibError → ветка
+# _safe_ingest except LibError); «один сбойный файл не рушит батч» —
+# test_broken_file_does_not_kill_batch.
 
 
 def _lib_with_book(tmp_path, monkeypatch):
