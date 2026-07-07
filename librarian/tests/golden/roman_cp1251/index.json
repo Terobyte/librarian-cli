@@ -6,8 +6,8 @@
       "id": "roman-cp1251",
       "status": "ok",
       "title": "roman_cp1251",
-      "total_tokens": 225
+      "total_tokens": 636
     }
   ],
-  "pipeline_version": "2.2"
+  "pipeline_version": "2.3"
 }

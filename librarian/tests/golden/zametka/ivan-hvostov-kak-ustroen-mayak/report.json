@@ -1,13 +1,17 @@
 {
   "config_hash": "1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
-  "control_chars": 0,
   "hard_triggers": [],
   "metrics": {
-    "median_tokens": 1448.0,
+    "coverage": 1.0021,
+    "dehyphen_residue": 0.0,
+    "encoding_score": 0.0,
+    "garbage_ratio": 0.0,
     "structure": 1.0
   },
+  "multi_column_pages": [],
   "oversize_blocks_split": 0,
-  "pipeline_version": "2.2",
+  "pages_flagged": [],
+  "pipeline_version": "2.3",
   "removed": {},
   "score": 1.0,
   "status": "ok",
@@ -18,5 +22,6 @@
     "garbage": 1.0,
     "structure": 1.0
   },
+  "unknown_tags": {},
   "warnings": []
 }

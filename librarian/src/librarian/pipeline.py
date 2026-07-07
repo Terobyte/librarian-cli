@@ -102,14 +102,15 @@ def ingest_file(path: Path, cfg: Config, lib_root: Path,
         ctx.report.structure_fallback = True
         chapters = fallback_cut(blocks, raw.title or cfg.general.preface_title, cfg)
     chapters = apply_section_passes(chapters, ctx)                       # 8
-    for ch in chapters:                                                  # 9 — финальные токены
-        ch.tokens = count(render_chapter(ch))
-    metrics = compute_metrics(chapters, ctx)                             # 10
+    rendered = [render_chapter(ch) for ch in chapters]               # 9 — рендер один раз
+    for ch, text in zip(chapters, rendered):
+        ch.tokens = count(text)
+    metrics = compute_metrics(chapters, ctx, rendered)               # 10
     score, status, subscores, triggers = score_and_status(metrics, cfg)
     report = build_report(ctx, metrics, subscores, triggers, score, status, cfg)
     if status == "failed":                                               # 11
-        print(f"{path.name}: failed (score {score}) — книга не сохранена",
-              file=sys.stderr)
+        reasons = "; ".join(triggers) if triggers else f"score {score}"
+        print(f"{path.name}: failed ({reasons}) — книга не сохранена", file=sys.stderr)
         return IngestOutcome(path, None, "failed", score, "score ниже порога")
     book_id = _resolve_identity(path, raw, sha, lib_root, cfg)           # 12
     title, author, lang, locked = (raw.title or path.stem), (raw.author or ""), raw.lang, False
