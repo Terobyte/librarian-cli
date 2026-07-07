@@ -1,0 +1,13 @@
+{
+  "books": [
+    {
+      "author": "Пелагея Морская",
+      "chapters": 2,
+      "id": "pelageya-morskaya-otchet-o-plavanii",
+      "status": "ok",
+      "title": "Отчёт о плавании",
+      "total_tokens": 1980
+    }
+  ],
+  "pipeline_version": "2.2"
+}

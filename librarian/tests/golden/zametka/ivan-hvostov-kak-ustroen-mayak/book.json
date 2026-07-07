@@ -1,0 +1,32 @@
+{
+  "author": "Иван Хвостов",
+  "chapters": [
+    {
+      "file": "chapters/001-kak-ustroen-mayak.md",
+      "n": 1,
+      "summary": "Маяк стоит на скале уже двести лет, и свет его виден за тридцать миль, а смотритель поднимается по винтовой лестнице дважды в сутки, проверяя линзы и часовой механизм, который вращает световую камеру. Маяк стоит на скале уже двести лет, и свет его виден за тридцать миль, а смотритель поднимается по… — Линза Френеля · Часовой механизм",
+      "title": "Как устроен маяк",
+      "tokens": 1448
+    }
+  ],
+  "id": "ivan-hvostov-kak-ustroen-mayak",
+  "lang": "ru",
+  "meta_locked": false,
+  "provenance": {
+    "cache_key": "7e4dddf4c3562faaa8c008627de8cbe7ecf2df1819dffd586feead5813f0e2c7:2.2:1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "config_hash": "1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "ingested_at": "1970-01-01T00:00:00Z",
+    "pipeline_version": "2.2"
+  },
+  "quality": {
+    "score": 1.0,
+    "status": "ok"
+  },
+  "source": {
+    "file": "zametka.html",
+    "format": "html",
+    "sha256": "7e4dddf4c3562faaa8c008627de8cbe7ecf2df1819dffd586feead5813f0e2c7"
+  },
+  "title": "Как устроен маяк",
+  "total_tokens": 1448
+}

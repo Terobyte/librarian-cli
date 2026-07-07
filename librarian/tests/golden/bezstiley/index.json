@@ -1,0 +1,13 @@
+{
+  "books": [
+    {
+      "author": "",
+      "chapters": 2,
+      "id": "bezstiley",
+      "status": "ok",
+      "title": "bezstiley",
+      "total_tokens": 1296
+    }
+  ],
+  "pipeline_version": "2.2"
+}
