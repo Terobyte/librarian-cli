@@ -294,3 +294,24 @@ def test_trailing_heading_only_file_is_not_a_divider(tmp_path):
                       ("Chapter One", 2, "epub-file"),
                       ("Sub", 3, ""),
                       ("The End", 2, "")]
+
+
+def test_nav_walkers_accept_bare_link_toc():
+    # t12: ebooklib при одиночном navPoint в NCX кладёт в book.toc голый Link
+    # (не список) — реальный кейс, TypeError на казахском epub из библиотеки.
+    from ebooklib.epub import Link, Section
+
+    from librarian.extractors.epub import _nav_counts, _nav_titles
+
+    class BareLink:
+        toc = Link("ch1.xhtml", "Глава 1", "c1")
+
+    assert _nav_titles(BareLink()) == {"ch1.xhtml": "Глава 1"}
+    assert _nav_counts(BareLink()) == {"ch1.xhtml": 1}
+
+    class BareChild:                                    # children тоже бывает голым Link
+        toc = [(Section("Часть I", href="pt1.xhtml"),
+                Link("ch1.xhtml", "Глава 1", "c1"))]
+
+    assert _nav_titles(BareChild()) == {"pt1.xhtml": "Часть I", "ch1.xhtml": "Глава 1"}
+    assert _nav_counts(BareChild()) == {"pt1.xhtml": 1, "ch1.xhtml": 1}

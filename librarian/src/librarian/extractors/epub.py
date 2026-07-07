@@ -31,6 +31,13 @@ def _dc(book, name: str) -> str | None:
     return None
 
 
+def _as_list(items) -> list:
+    """ebooklib отдаёт toc/children списком, но при одиночном navPoint — голый Link."""
+    if isinstance(items, list):
+        return items
+    return [items] if items else []
+
+
 def _nav_titles(book) -> dict[str, str]:
     """href (basename, без фрагмента) → название; первая запись побеждает."""
     out: dict[str, str] = {}
@@ -42,14 +49,14 @@ def _nav_titles(book) -> dict[str, str]:
                 href = getattr(sec, "href", "") or ""
                 if href and sec.title and _basename(href) not in out:
                     out[_basename(href)] = sec.title
-                walk(children)
+                walk(_as_list(children))
             else:                                       # Link
                 href = getattr(it, "href", "") or ""
                 title = getattr(it, "title", "") or ""
                 if href and title and _basename(href) not in out:
                     out[_basename(href)] = title
 
-    walk(book.toc or [])
+    walk(_as_list(book.toc))
     return out
 
 
@@ -69,14 +76,14 @@ def _nav_counts(book) -> dict[str, int]:
                 href = getattr(sec, "href", "") or ""
                 if href and sec.title:
                     bump(href)
-                walk(children)
+                walk(_as_list(children))
             else:                                       # Link
                 href = getattr(it, "href", "") or ""
                 title = getattr(it, "title", "") or ""
                 if href and title:
                     bump(href)
 
-    walk(book.toc or [])
+    walk(_as_list(book.toc))
     return out
 
 
