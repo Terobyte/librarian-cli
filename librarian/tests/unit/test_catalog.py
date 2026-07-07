@@ -44,3 +44,13 @@ def test_find_and_read(tmp_path):
     assert read_book(tmp_path, "one")["id"] == "one"
     with pytest.raises(UnknownBookError):
         read_book(tmp_path, "missing")
+
+
+def test_broken_dirs_lists_unreadable_book_json(tmp_path):
+    from librarian.catalog import broken_dirs
+    good = tmp_path / "good-book"; good.mkdir()
+    (good / "book.json").write_text('{"id": "good-book"}', encoding="utf-8")
+    bad = tmp_path / "bad-book"; bad.mkdir()
+    (bad / "book.json").write_text("{оборвано…", encoding="utf-8")
+    nojson = tmp_path / "no-json"; nojson.mkdir()
+    assert broken_dirs(tmp_path) == ["bad-book"]

@@ -9,7 +9,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from librarian.catalog import read_book, rebuild_index
+from librarian.catalog import broken_dirs, read_book, rebuild_index, scan_books
 from librarian.config import load_config
 from librarian.emit import library_lock, recover
 from librarian.errors import LibError
@@ -160,3 +160,39 @@ def rm(book_id: str) -> None:
     except LibError as e:
         _err.print(str(e))
         raise typer.Exit(1)
+
+
+@app.command()
+def doctor(book_id: str = typer.Argument(None)) -> None:
+    import json
+    out = Console()
+    lib = _lib_root()
+    try:
+        if book_id is None:
+            t = Table("id", "score", "триггеры", title="книги в review")
+            for bid, b in scan_books(lib):
+                if b.get("quality", {}).get("status") != "review":
+                    continue
+                rep = _read_report(lib, bid)
+                t.add_row(bid, str(b["quality"].get("score", "")),
+                          "; ".join(rep.get("hard_triggers", [])))
+            out.print(t)
+            for bid in broken_dirs(lib):
+                out.print(f"битый book.json: {bid}")
+        else:
+            read_book(lib, book_id)                     # неизвестный id → exit 1
+            rep = _read_report(lib, book_id)
+            payload = {k: rep.get(k) for k in
+                       ("status", "score", "hard_triggers", "pages_flagged",
+                        "multi_column_pages", "warnings", "removed")}
+            sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2,
+                                        sort_keys=True) + "\n")
+    except LibError as e:
+        _err.print(str(e))
+        raise typer.Exit(1)
+
+
+def _read_report(lib: Path, book_id: str) -> dict:
+    import json
+    p = lib / book_id / "report.json"
+    return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}

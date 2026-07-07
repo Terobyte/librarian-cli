@@ -192,3 +192,27 @@ def test_list_corrupted_index_json(tmp_path):
     assert isinstance(r2.exception, SystemExit)
 
 
+def test_doctor_book_shows_triggers_and_removed(tmp_path, monkeypatch):
+    import json
+    from pathlib import Path
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    from librarian.config import load_config
+    from librarian.pipeline import run_ingest
+
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
+    fx = Path(__file__).parent.parent / "fixtures" / "txt" / "roman_cp1251.txt"
+    out = run_ingest([fx], load_config(None), tmp_path)[0]
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "doctor", out.book_id])
+    assert r.exit_code == 0
+    payload = json.loads(r.stdout)
+    assert {"hard_triggers", "pages_flagged", "removed", "warnings"} <= set(payload)
+
+
+def test_doctor_unknown_id_exits_1(tmp_path):
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "doctor", "net-takoy"])
+    assert r.exit_code == 1
+
+

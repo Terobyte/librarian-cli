@@ -62,3 +62,20 @@ def find_by_cache_key(lib_root: Path, key: str) -> str | None:
         if b.get("provenance", {}).get("cache_key") == key:
             return bid
     return None
+
+
+def broken_dirs(lib_root: Path) -> list[str]:
+    """Каталоги книг с нечитаемым book.json (С-4) — для doctor."""
+    out: list[str] = []
+    if not lib_root.is_dir():
+        return out
+    for d in sorted(p for p in lib_root.iterdir()
+                    if p.is_dir() and not p.name.startswith(".")):
+        bj = d / "book.json"
+        if not bj.is_file():
+            continue
+        try:
+            json.loads(bj.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            out.append(d.name)
+    return out
