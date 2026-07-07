@@ -3,7 +3,8 @@ from __future__ import annotations
 import re
 import unicodedata
 
-from librarian.ir import Block, BlockKind, DocContext
+from librarian.ir import Block, BlockKind, DocContext, Format
+from librarian.passes.pdf_layout import PDF_PASSES
 
 _INVISIBLE = dict.fromkeys(map(ord, "­​‌‍﻿"))
 _MULTISPACE = re.compile(r"[ \t]+")
@@ -47,4 +48,7 @@ COMMON_PASSES = [n1_unicode, n2_whitespace, n3_controls]
 def apply_block_passes(blocks: list[Block], ctx: DocContext) -> list[Block]:
     for p in COMMON_PASSES:
         blocks = p(blocks, ctx)
+    if ctx.fmt is Format.PDF:                            # §7: P1–P7 только PDF
+        for p in PDF_PASSES:
+            blocks = p(blocks, ctx)
     return blocks
