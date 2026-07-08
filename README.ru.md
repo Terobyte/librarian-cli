@@ -1,4 +1,4 @@
-# librarian
+# 📚 librarian
 
 English version: [README.md](README.md) (канон, его видит PyPI).
 
