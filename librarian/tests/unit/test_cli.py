@@ -279,3 +279,122 @@ def test_reingest_requires_all_flag(tmp_path):
     from librarian.cli import app
     r = CliRunner().invoke(app, ["--library", str(tmp_path), "reingest"])
     assert r.exit_code == 2
+
+
+def _mklib_two_books(tmp_path, monkeypatch):
+    """Библиотека из двух книг с разным содержанием — для find-тестов."""
+    from librarian.config import load_config
+    from librarian.pipeline import run_ingest
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
+    src_dir = tmp_path / "_src"
+    src_dir.mkdir(exist_ok=True)
+    src1 = src_dir / "roman_o_kitah.txt"
+    src1.write_text(
+        "Глава 1\n\n"
+        + "Кит шёл на юг, раздвигая тяжёлую воду каждую спокойную ночь. " * 8
+        + "\n\nГлава 2\n\n"
+        + "Про маятники и облака рассказывает вторая глава книги целиком. " * 8,
+        encoding="utf-8")
+    src2 = src_dir / "povest_o_ptitsah.txt"
+    src2.write_text(
+        "Глава 1\n\n"
+        + "Птицы летели на юг сквозь холодный воздух каждую спокойную ночь. " * 8,
+        encoding="utf-8")
+    out1 = run_ingest([src1], load_config(None), tmp_path)[0]
+    out2 = run_ingest([src2], load_config(None), tmp_path)[0]
+    assert out1.status in ("ok", "review") and out1.book_id, out1.message
+    assert out2.status in ("ok", "review") and out2.book_id, out2.message
+    return out1.book_id, out2.book_id
+
+
+def test_find_table_output(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    bid1, _ = _mklib_two_books(tmp_path, monkeypatch)
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "find", "кит"])
+    assert r.exit_code == 0
+    assert bid1 in r.stdout
+
+
+def test_find_nothing_found_exit_0(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    _mklib_two_books(tmp_path, monkeypatch)
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "find",
+                                 "совершенноневстречающеесяслово"])
+    assert r.exit_code == 0
+    assert "не найдено" in r.stderr
+
+
+def test_find_empty_query_exit_2(tmp_path):
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "find", "   "])
+    assert r.exit_code == 2
+
+
+def test_find_book_filter(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    bid1, bid2 = _mklib_two_books(tmp_path, monkeypatch)
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "find", "спокойную",
+                                 "--book", bid2])
+    assert r.exit_code == 0
+    assert bid2 in r.stdout
+    assert bid1 not in r.stdout
+
+
+def test_find_reindex_flag(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    bid1, _ = _mklib_two_books(tmp_path, monkeypatch)
+    r1 = CliRunner().invoke(app, ["--library", str(tmp_path), "find", "кит"])
+    assert r1.exit_code == 0
+    r2 = CliRunner().invoke(app, ["--library", str(tmp_path), "find", "кит", "--reindex"])
+    assert r2.exit_code == 0
+    assert bid1 in r2.stdout
+
+
+def test_find_json_valid_and_no_stderr(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    bid1, _ = _mklib_two_books(tmp_path, monkeypatch)
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "find", "кит", "--json"])
+    assert r.exit_code == 0
+    assert r.stderr == ""
+    payload = json.loads(r.stdout)
+    assert set(payload) == {"hits", "partial"}
+    assert any(h["book_id"] == bid1 for h in payload["hits"])
+
+
+def test_find_json_empty_result_no_stderr(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    _mklib_two_books(tmp_path, monkeypatch)
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "find",
+                                 "совершенноневстречающеесяслово", "--json"])
+    assert r.exit_code == 0
+    assert r.stderr == ""
+    assert json.loads(r.stdout) == {"hits": [], "partial": False}
+
+
+def test_find_or_fallback_warns_on_stderr_in_table_mode(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    _mklib_two_books(tmp_path, monkeypatch)
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "find",
+                                 "кит совершенноневстречающеесяслово"])
+    assert r.exit_code == 0
+    assert "частичные" in r.stderr
+
+
+def test_find_or_fallback_partial_true_in_json(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+    from librarian.cli import app
+    _mklib_two_books(tmp_path, monkeypatch)
+    r = CliRunner().invoke(app, ["--library", str(tmp_path), "find",
+                                 "кит совершенноневстречающеесяслово", "--json"])
+    assert r.exit_code == 0
+    assert r.stderr == ""
+    payload = json.loads(r.stdout)
+    assert payload["partial"] is True

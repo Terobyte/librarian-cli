@@ -16,6 +16,7 @@ from librarian.config import load_config
 from librarian.emit import library_lock, recover
 from librarian.errors import LibError
 from librarian.pipeline import run_ingest, run_reingest
+from librarian.search import search as run_search
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 _state: dict = {"library": None}
@@ -122,6 +123,43 @@ def get(book_id: str,
     except (LibError, ValueError) as e:
         _err.print(str(e))
         raise typer.Exit(1)
+
+
+@app.command()
+def find(query: str,
+         limit: int = typer.Option(10, "--limit"),
+         book: str = typer.Option(None, "--book", help="фильтр по id книги"),
+         reindex: bool = typer.Option(False, "--reindex", help="принудительная пересборка индекса"),
+         json_out: bool = typer.Option(False, "--json")) -> None:
+    import json
+    if not query.split():
+        _err.print("пустой запрос")
+        raise typer.Exit(2)
+    lib = _lib_root()
+    cold = reindex or not (lib / ".search.db").is_file()
+    if cold and not json_out:
+        _err.print("строю индекс…")
+    try:
+        res = run_search(lib, query, limit=limit, book_id=book, reindex=reindex)
+    except LibError as e:
+        _err.print(str(e))
+        raise typer.Exit(1)
+    if json_out:
+        sys.stdout.write(json.dumps(res, ensure_ascii=False) + "\n")
+        return
+    if not res["hits"]:
+        _err.print("ничего не найдено")
+        return
+    if res["partial"]:
+        _err.print("точного совпадения нет — частичные")
+    out = Console()
+    t = Table("id", "глава", "заголовок", "сниппет")
+    for h in res["hits"]:
+        t.add_row(h["book_id"],
+                  "—" if h["n"] is None else str(h["n"]),
+                  h["book_title"] if h["chapter_title"] is None else h["chapter_title"],
+                  h["snippet"])
+    out.print(t)
 
 
 @app.command()
