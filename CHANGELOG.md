@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 — 2026-07-08
+
+- Fix the `mcp-name` ownership marker case (`io.github.Terobyte/librarian`) so the MCP
+  registry can validate the PyPI package; shorter registry description. No code changes.
+
 ## 0.1.0 — 2026-07-08
 
 - Deterministic pipeline turning FB2, EPUB, DOCX, HTML, TXT/MD, and text-layer PDF into

@@ -1,4 +1,4 @@
-<!-- mcp-name: io.github.terobyte/librarian -->
+<!-- mcp-name: io.github.Terobyte/librarian -->
 # librarian
 
 [![CI](https://github.com/Terobyte/librarian-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/Terobyte/librarian-cli/actions/workflows/ci.yml)
