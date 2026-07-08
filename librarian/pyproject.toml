@@ -12,8 +12,11 @@ dependencies = [
 [project.scripts]
 lib = "librarian.cli:app"
 
+[project.optional-dependencies]
+serve = ["mcp>=1.0"]
+
 [dependency-groups]
-dev = ["pytest>=8", "pytest-socket>=0.7"]
+dev = ["pytest>=8", "pytest-socket>=0.7", "mcp>=1.0"]
 
 [build-system]
 requires = ["hatchling"]

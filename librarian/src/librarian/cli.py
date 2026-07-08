@@ -163,6 +163,22 @@ def find(query: str,
 
 
 @app.command()
+def serve(library: Path | None = typer.Option(None, "--library",
+                                               help="корень библиотеки")) -> None:
+    try:
+        from librarian.serve import serve as run_serve
+    except ImportError:
+        _err.print("установите librarian\\[serve]")
+        raise typer.Exit(1)
+    lib = library if library is not None else _lib_root()
+    try:
+        run_serve(lib)
+    except LibError as e:
+        _err.print(str(e))
+        raise typer.Exit(1)
+
+
+@app.command()
 def reingest(all_: bool = typer.Option(False, "--all"),
              config: Path | None = typer.Option(None, "--config"),
              verbose: bool = typer.Option(False, "--verbose")) -> None:
