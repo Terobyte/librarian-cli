@@ -192,6 +192,64 @@ def test_reingest_failed_book_keeps_id(tmp_path, monkeypatch):
     assert outcomes[0].book_id == bid
 
 
+def _patch_extract(monkeypatch, **overrides):
+    # реальный экстрактор (in-process, conftest) + подмена полей RawDoc
+    import librarian.pipeline as pipe
+    real = pipe.guarded_extract
+    monkeypatch.setattr(
+        "librarian.pipeline.guarded_extract",
+        lambda fmt, path, cfg: dataclasses.replace(real(fmt, path, cfg), **overrides))
+
+
+def test_metadata_repair_forces_review(tmp_path, monkeypatch):
+    # placeholder-заголовок "GET" → status review + триггер + id из имени файла
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
+    src = _write(tmp_path)                              # "роман.txt"
+    _patch_extract(monkeypatch, title="GET", author="")
+    lib = tmp_path / "library"
+    out = run_ingest([src], Config(), lib)[0]
+    assert out.status == "review"
+    bid = out.book_id
+    assert bid == "roman"                               # id из stem, не из "get"
+    book = json.loads((lib / bid / "book.json").read_text(encoding="utf-8"))
+    report = json.loads((lib / bid / "report.json").read_text(encoding="utf-8"))
+    assert book["quality"]["status"] == "review"
+    assert any("metadata_repaired" in t for t in report["hard_triggers"])
+
+
+def test_empty_title_uploader_author_id_from_stem(tmp_path, monkeypatch):
+    # Fix1: пустой title + автор-«загрузчик» → id из имени файла, автор сохранён,
+    # review НЕ форсится (это не репарация)
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
+    src = _write(tmp_path)
+    _patch_extract(monkeypatch, title=None, author="Uploader X")
+    lib = tmp_path / "library"
+    out = run_ingest([src], Config(), lib)[0]
+    bid = out.book_id
+    assert bid == "roman"                               # НЕ "uploader-x"
+    book = json.loads((lib / bid / "book.json").read_text(encoding="utf-8"))
+    assert book["author"] == "Uploader X"
+    assert book["quality"]["status"] == "ok"
+
+
+def test_meta_locked_garbage_not_reflagged(tmp_path, monkeypatch):
+    # meta_locked-книга с мусорным raw.title НЕ уходит повторно в review,
+    # сохранённый title остаётся ручным
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
+    src = _write(tmp_path)
+    lib = tmp_path / "library"
+    bid = run_ingest([src], Config(), lib)[0].book_id
+    bj = lib / bid / "book.json"
+    data = json.loads(bj.read_text(encoding="utf-8"))
+    data["title"], data["meta_locked"] = "Ручное имя", True
+    bj.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    _patch_extract(monkeypatch, title="GET")
+    run_ingest([src], Config(), lib, force=True)
+    after = json.loads(bj.read_text(encoding="utf-8"))
+    assert after["title"] == "Ручное имя" and after["meta_locked"] is True
+    assert after["quality"]["status"] == "ok"
+
+
 def test_reingest_failed_by_score_keeps_id(tmp_path, monkeypatch):
     # К-1, путь (b) — failed по score, НЕ исключение: бьёт в ветку
     # `if status == "failed"` внутри ingest_file (она правится отдельно от

@@ -15,6 +15,7 @@ from librarian.emit import (emit_book, lang_heuristic, library_lock,
 from librarian.errors import DetectError, LibError, LimitError
 from librarian.extractors.guard import guarded_extract
 from librarian.ir import BlockKind, BookMeta, DocContext, ReportDraft
+from librarian.metadata import repair_metadata
 from librarian.passes.normalize import apply_block_passes
 from librarian.passes.sections import apply_section_passes
 from librarian.quality import build_report, compute_metrics, score_and_status
@@ -72,6 +73,7 @@ def ingest_file(path: Path, cfg: Config, lib_root: Path,
         if existing:
             return IngestOutcome(path, existing, "skipped", None, "уже в библиотеке")
     raw = guarded_extract(fmt, path, cfg)                                # 4, §6.0
+    rtitle, rauthor, repaired, reason = repair_metadata(raw, path)       # 4b: §9 P1
     ctx = DocContext(fmt, cfg, raw,
                      ReportDraft(unknown_tags=dict(raw.unknown_tags)))         # 5
     blocks = apply_block_passes(raw.blocks, ctx)                         # 6
@@ -82,21 +84,20 @@ def ingest_file(path: Path, cfg: Config, lib_root: Path,
         chapters = cut_chapters(root, level, cfg)
     else:
         ctx.report.structure_fallback = True
-        chapters = fallback_cut(blocks, raw.title or cfg.general.preface_title, cfg)
+        chapters = fallback_cut(blocks, rtitle or cfg.general.preface_title, cfg)
     chapters = apply_section_passes(chapters, ctx)                       # 8
     rendered = [render_chapter(ch) for ch in chapters]               # 9 — рендер один раз
     for ch, text in zip(chapters, rendered):
         ch.tokens = count(text)
     metrics = compute_metrics(chapters, ctx, rendered)               # 10
     score, status, subscores, triggers = score_and_status(metrics, cfg)
-    report = build_report(ctx, metrics, subscores, triggers, score, status, cfg)
-    if status == "failed":                                               # 11
+    if status == "failed":                                               # 11: до build_report
         reasons = "; ".join(triggers) if triggers else f"score {score}"
         print(f"{path.name}: failed ({reasons}) — книга не сохранена", file=sys.stderr)
         return IngestOutcome(path, book_id, "failed", score, "score ниже порога")
     if book_id is None:                                                  # 12: reingest знает id заранее (К-1)
-        book_id = _resolve_identity(path, raw, sha, lib_root, cfg)
-    title, author, lang, locked = (raw.title or path.stem), (raw.author or ""), raw.lang, False
+        book_id = _resolve_identity(path, rtitle, rauthor, sha, lib_root, cfg)
+    title, author, lang, locked = (rtitle or path.stem), (rauthor or ""), raw.lang, False
     try:
         prev = read_book(lib_root, book_id)
     except LibError:
@@ -104,8 +105,12 @@ def ingest_file(path: Path, cfg: Config, lib_root: Path,
     if prev and prev.get("meta_locked"):                                 # С-2
         title, author, lang, locked = (prev["title"], prev["author"],
                                        prev["lang"], True)
+    if repaired and not locked:                                          # §9 P2: репарация → review
+        triggers = triggers + [reason]
+        status = "review" if status == "ok" else status
     if lang is None:
         lang = lang_heuristic("\n".join(b.text for b in blocks))
+    report = build_report(ctx, metrics, subscores, triggers, score, status, cfg)  # один раз, post-lock
     meta = BookMeta(id=book_id, title=title, author=author, lang=lang,
                     meta_locked=locked, source_path=path, fmt=fmt, sha256=sha,
                     config_hash=chash, cache_key=cache_key,
@@ -133,11 +138,12 @@ def run_reingest(cfg: Config, lib_root: Path) -> list[IngestOutcome]:
     return outcomes
 
 
-def _resolve_identity(path: Path, raw, sha: str, lib_root: Path, cfg: Config) -> str:
+def _resolve_identity(path: Path, rtitle, rauthor, sha: str, lib_root: Path, cfg: Config) -> str:
     same = find_by_sha256(lib_root, sha)            # переингест того же файла (--force)
     if same:
         return same
-    book_id = make_id(raw.title, raw.author, path.stem, cfg.slug.max_len)
+    id_author = rauthor if rtitle else ""           # §9 P3: автор один не задаёт id
+    book_id = make_id(rtitle, id_author, path.stem, cfg.slug.max_len)
     bj = lib_root / book_id / "book.json"
     if bj.is_file():                                # коллизия id с другим файлом (12.1)
         try:

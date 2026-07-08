@@ -9,24 +9,24 @@
       "tokens": 1630
     }
   ],
-  "id": "ivan-hvostov-skazka-o-kite",
+  "id": "zaglushka",
   "lang": "ru",
   "meta_locked": false,
   "provenance": {
-    "cache_key": "7bc78115d939a9f7f009d85cb259cdefb827870e97b14fb4535dd24ca420a175:2.4:1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
+    "cache_key": "108299897ad69227c4f2a468dc299f4f06990d871d15b3d48092aa31275075f6:2.4:1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
     "config_hash": "1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
     "ingested_at": "1970-01-01T00:00:00Z",
     "pipeline_version": "2.4"
   },
   "quality": {
     "score": 1.0,
-    "status": "ok"
+    "status": "review"
   },
   "source": {
-    "file": "skazka.fb2",
+    "file": "zaglushka.fb2",
     "format": "fb2",
-    "sha256": "7bc78115d939a9f7f009d85cb259cdefb827870e97b14fb4535dd24ca420a175"
+    "sha256": "108299897ad69227c4f2a468dc299f4f06990d871d15b3d48092aa31275075f6"
   },
-  "title": "Сказка о ките",
+  "title": "zaglushka",
   "total_tokens": 1630
 }

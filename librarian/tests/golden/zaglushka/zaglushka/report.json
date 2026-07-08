@@ -1,8 +1,10 @@
 {
   "config_hash": "1435b4792a113d7501153f3da16dd878abaa3a886c902bd6c01f390b5656b6e8",
-  "hard_triggers": [],
+  "hard_triggers": [
+    "metadata_repaired (имя файла)"
+  ],
   "metrics": {
-    "coverage": 1.0002,
+    "coverage": 0.9945,
     "dehyphen_residue": 0.0,
     "encoding_score": 0.0,
     "garbage_ratio": 0.0,
@@ -14,7 +16,7 @@
   "pipeline_version": "2.4",
   "removed": {},
   "score": 1.0,
-  "status": "ok",
+  "status": "review",
   "subscores": {
     "coverage": 1.0,
     "dehyphen": 1.0,
