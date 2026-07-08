@@ -2,9 +2,9 @@
 # 📚 librarian
 
 [![CI](https://github.com/Terobyte/librarian-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/Terobyte/librarian-cli/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/librarian-cli.svg)](https://pypi.org/project/librarian-cli/)
-[![Python versions](https://img.shields.io/pypi/pyversions/librarian-cli.svg)](https://pypi.org/project/librarian-cli/)
-[![License](https://img.shields.io/pypi/l/librarian-cli.svg)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/librarian-cli)](https://pypi.org/project/librarian-cli/)
+[![Python versions](https://img.shields.io/pypi/pyversions/librarian-cli)](https://pypi.org/project/librarian-cli/)
+[![License](https://img.shields.io/pypi/l/librarian-cli)](LICENSE)
 [![MCP registry](https://img.shields.io/badge/MCP_registry-io.github.Terobyte%2Flibrarian-6A5ACD)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.Terobyte/librarian)
 
 Turn any ebook into clean, token-counted Markdown chapters — and let Claude read your
