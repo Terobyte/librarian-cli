@@ -159,6 +159,8 @@ def test_book_info_bad_book_id_raises(tmp_path, bad_id):
 
 # --- e2e smoke: real subprocess + MCP stdio handshake -------------------------
 
+# на Windows asyncio поднимает внутренний socketpair — pytest-socket его блокирует
+@pytest.mark.enable_socket
 @pytest.mark.anyio
 async def test_e2e_subprocess_handshake_and_list_books(tmp_path):
     import anyio
