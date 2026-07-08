@@ -8,7 +8,8 @@ os.environ.setdefault("LIB_EXTRACT_INPROCESS", "1")
 
 
 def tree_bytes(root: Path) -> dict[str, bytes]:
-    """Recursive {relative_path: file_bytes} excluding .lock, for golden/determinism/cache tests."""
+    """Recursive {relative_path: file_bytes} excluding .lock and .search.db (derived
+    cache, M6), for golden/determinism/cache tests."""
     return {str(p.relative_to(root)).replace(os.sep, "/"): p.read_bytes()
             for p in sorted(root.rglob("*"))
-            if p.is_file() and p.name != ".lock"}
+            if p.is_file() and p.name not in (".lock", ".search.db")}

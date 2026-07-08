@@ -1,19 +1,13 @@
-import os
 from pathlib import Path
 
 import pytest
 
 from librarian.config import load_config
 from librarian.pipeline import run_ingest
+from conftest import tree_bytes
 
 ROOT = Path(__file__).parent
 FIXTURES = sorted((ROOT / "fixtures").rglob("*.*"))
-
-
-def tree_bytes(root: Path) -> dict[str, bytes]:
-    return {str(p.relative_to(root)).replace(os.sep, "/"): p.read_bytes()
-            for p in sorted(root.rglob("*"))
-            if p.is_file() and p.name != ".lock"}
 
 
 @pytest.mark.parametrize("fixture", FIXTURES, ids=lambda p: p.stem)

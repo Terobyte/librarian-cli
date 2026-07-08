@@ -1,6 +1,7 @@
 import json
-from librarian.catalog import find_by_sha256, read_book, rebuild_index, scan_books
-from librarian.errors import UnknownBookError
+from librarian.catalog import (find_by_sha256, get_chapters_core, read_book,
+                                rebuild_index, scan_books, validate_book_id)
+from librarian.errors import LibError, UnknownBookError
 import pytest
 
 def _book(lib, bid, sha="x", status="ok"):
@@ -54,3 +55,37 @@ def test_broken_dirs_lists_unreadable_book_json(tmp_path):
     (bad / "book.json").write_text("{оборвано…", encoding="utf-8")
     nojson = tmp_path / "no-json"; nojson.mkdir()
     assert broken_dirs(tmp_path) == ["bad-book"]
+
+
+@pytest.mark.parametrize("bad_id", ["../x", "a/b", "/etc/passwd", ""])
+def test_validate_book_id_rejects_traversal(tmp_path, bad_id):
+    with pytest.raises(LibError):
+        validate_book_id(tmp_path, bad_id)
+    with pytest.raises(LibError):
+        read_book(tmp_path, bad_id)
+
+
+def test_validate_book_id_accepts_valid_slug(tmp_path):
+    _book(tmp_path, "valid-slug")
+    validate_book_id(tmp_path, "valid-slug")          # не бросает
+    assert read_book(tmp_path, "valid-slug")["id"] == "valid-slug"
+
+
+def test_get_chapters_core_budget_first_chapter_too_big(tmp_path):
+    d = tmp_path / "big"
+    (d / "chapters").mkdir(parents=True)
+    (d / "chapters" / "001.md").write_text("текст главы", encoding="utf-8")
+    (d / "book.json").write_text(json.dumps({
+        "id": "big", "title": "BIG", "author": "A", "lang": "ru",
+        "meta_locked": False,
+        "source": {"file": "f.txt", "format": "txt", "sha256": "x"},
+        "provenance": {"cache_key": "x:2.2:c"},
+        "quality": {"status": "ok", "score": 1.0},
+        "total_tokens": 500,
+        "chapters": [{"n": 1, "title": "Глава 1", "tokens": 500,
+                       "file": "chapters/001.md", "summary": None}],
+    }, ensure_ascii=False), encoding="utf-8")
+    res = get_chapters_core(tmp_path, "big", budget=1)
+    assert res["chapters"] == []
+    assert res["next_from"] == 1
+    assert res["message"]

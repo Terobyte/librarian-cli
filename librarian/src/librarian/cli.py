@@ -9,7 +9,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from librarian.catalog import broken_dirs, read_book, rebuild_index, scan_books
+from librarian.catalog import (broken_dirs, get_chapters_core, info_projection,
+                                read_book, read_index, rebuild_index, scan_books,
+                                validate_book_id)
 from librarian.config import load_config
 from librarian.emit import library_lock, recover
 from librarian.errors import LibError
@@ -79,10 +81,7 @@ def list_cmd(book_id: str = typer.Argument(None)) -> None:
     out = Console()
     try:
         if book_id is None:
-            import json
-            idx_path = _lib_root() / "index.json"
-            books = (json.loads(idx_path.read_text(encoding="utf-8"))["books"]
-                     if idx_path.is_file() else [])
+            books = read_index(_lib_root())
             t = Table("id", "автор", "название", "глав", "токенов", "статус")
             for b in books:
                 t.add_row(b["id"], b["author"] or "", b["title"] or "",
@@ -112,36 +111,14 @@ def get(book_id: str,
         _err.print("--from работает только вместе с --budget")
         raise typer.Exit(2)
     try:
-        lib = _lib_root()
-        book = read_book(lib, book_id)
-        chaps = sorted(book["chapters"], key=lambda c: c["n"])
-        if spec is not None:
-            nums = parse_spec(spec, len(chaps))
-        else:
-            if not 1 <= from_ <= len(chaps):
-                raise ValueError(f"--from {from_} вне 1..{len(chaps)}")
-            nums, total = [], 0
-            for ch in chaps[from_ - 1:]:
-                if total + ch["tokens"] > budget:
-                    break
-                nums.append(ch["n"])
-                total += ch["tokens"]
-            if not nums:
-                raise ValueError(
-                    f"глава {from_} ({chaps[from_ - 1]['tokens']} токенов) "
-                    f"не влезает в бюджет {budget}")
-            if from_ - 1 + len(nums) < len(chaps):
-                first_skipped = chaps[from_ - 1 + len(nums)]["n"]
-                _err.print(f"не вошли в бюджет: главы {first_skipped}–{chaps[-1]['n']}")
-        by_n = {ch["n"]: ch for ch in chaps}
-        book_dir = (lib / book_id).resolve()
-        texts: list[str] = []
-        for n in nums:
-            ch_path = (lib / book_id / by_n[n]["file"]).resolve()
-            if not ch_path.is_relative_to(book_dir):
-                raise LibError(f"недопустимый путь главы: {by_n[n]['file']}")
-            texts.append(ch_path.read_text(encoding="utf-8"))
-        sys.stdout.write("\n\n".join(t.rstrip("\n") for t in texts) + "\n")
+        res = get_chapters_core(_lib_root(), book_id, spec=spec, budget=budget,
+                                 from_=from_)
+        if budget is not None and not res["chapters"]:
+            _err.print(res["message"])
+            raise typer.Exit(1)
+        if res["message"]:
+            _err.print(res["message"])
+        sys.stdout.write(res["text"])
     except (LibError, ValueError) as e:
         _err.print(str(e))
         raise typer.Exit(1)
@@ -177,15 +154,7 @@ def reingest(all_: bool = typer.Option(False, "--all"),
 def info(book_id: str) -> None:
     import json
     try:
-        book = read_book(_lib_root(), book_id)
-        report_path = _lib_root() / book_id / "report.json"
-        report = (json.loads(report_path.read_text(encoding="utf-8"))
-                  if report_path.is_file() else {})
-        payload = {"book": book,
-                   "metrics": report.get("metrics", {}),
-                   "subscores": report.get("subscores", {}),
-                   "score": report.get("score"),
-                   "hard_triggers": report.get("hard_triggers", [])}
+        payload = info_projection(_lib_root(), book_id)
         sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2,
                                     sort_keys=True) + "\n")
     except LibError as e:
@@ -200,12 +169,8 @@ def rm(book_id: str) -> None:
     try:
         with library_lock(lib, cfg.general.lock_timeout_s):
             recover(lib)
+            validate_book_id(lib, book_id)
             target = lib / book_id
-            resolved = target.resolve()
-            if ("/" in book_id or "\\" in book_id
-                    or resolved == lib.resolve()
-                    or not resolved.is_relative_to(lib.resolve())):
-                raise LibError(f"недопустимый id книги: «{book_id}»")
             if not (target / "book.json").is_file():
                 raise LibError(f"книга «{book_id}» не найдена")
             shutil.rmtree(target)
