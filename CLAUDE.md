@@ -7,20 +7,23 @@
 
 ## Раскладка
 
-- Git-корень — этот каталог (`libby/`). Пакет — в `librarian/` (все команды запускать оттуда).
-- `librarian/README.md` — пользовательская дока (команды, установка, квота качества, лимиты).
-- `docs/MILESTONES.md` — история вех M1–M6 и **сквозной список отклонений от спеки** (почему
+- Git-корень — этот каталог (`libby/`), он же корень пакета: с M7 `librarian/{pyproject.toml,
+  src,tests,scripts,uv.lock}` сплющены прямо сюда (репо на GitHub — `librarian-cli`), все
+  команды запускать отсюда, без `cd`.
+- `README.md` — англ. пользовательская дока (канон, её видит PyPI: команды, установка,
+  квота качества, лимиты). `README.ru.md` — русская версия того же.
+- `docs/MILESTONES.md` — история вех M1–M7 и **сквозной список отклонений от спеки** (почему
   код расходится с дизайном). Читать перед правкой спорного места.
 - `librarian-spec-v2.2.md` — канон дизайна (спека). `docs/superpowers/` — дизайн-доки/планы.
 
-## Команды (из `librarian/`)
+## Команды
 
 ```bash
 uv run pytest -q                      # весь набор (~330 тестов, ~19с)
 uv run pytest tests/test_golden.py    # только golden (детерминизм выхода)
 uv run lib ingest книга.epub          # обработать в ./library
 uv run lib find маятник               # FTS5-поиск; --json для машинного вывода
-uv run --extra serve lib serve        # MCP-сервер (stdio); extra тянет mcp
+uv run lib serve                      # MCP-сервер (stdio); mcp — основная зависимость
 uv build                              # wheel; офлайн-установка не требует сети
 ```
 
@@ -65,7 +68,8 @@ structure → sections(R1–R5) → quality → emit`.
 
 - CLI: `ingest · list · get (spec | --budget) · find · info · doctor · reingest · rm · serve`.
 - `lib serve` = детерминированный RAG без эмбеддингов/сети/ключей: Claude сам листает
-  каталог, ищет FTS5, тянет главы под токен-бюджет. Extra `librarian[serve]` (тянет `mcp`).
+  каталог, ищет FTS5, тянет главы под токен-бюджет. MCP-сервер — в базовой установке
+  (`mcp` в основных зависимостях, отклонение 37; extra `serve` — пустой compat-шим).
 - Качество: `ok` (≥0.90, без триггеров) молча в библиотеку; `review` сохранена с
   предупреждением; `failed` (<0.60) не сохраняется. Правки метаданных руками защищаются
   `"meta_locked": true` в book.json (reingest не перетрёт).

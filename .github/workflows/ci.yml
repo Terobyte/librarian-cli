@@ -15,7 +15,6 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: тесты (сеть в тестах блокирует pytest-socket)
-        working-directory: librarian
         run: |
           uv sync --frozen
           uv run pytest -q
@@ -31,15 +30,14 @@ jobs:
                                            # (uv build может взять managed-python —
                                            # wheel py3-none-any, это не важно)
       - name: собрать wheel и скачать зависимости (сеть ещё разрешена)
-        working-directory: librarian
         run: |
           uv build --wheel
           python -m pip download -d /tmp/wheelhouse dist/*.whl
       - name: установка и smoke строго офлайн (--no-index)
-        working-directory: librarian
         run: |
           python -m venv /tmp/clean
           /tmp/clean/bin/pip install --no-index --find-links /tmp/wheelhouse dist/*.whl
           printf 'Глава 1\n\nТекст главы про море и маяк, длинный и спокойный.\n' > /tmp/kniga.txt
           /tmp/clean/bin/lib --library /tmp/lib ingest /tmp/kniga.txt
           /tmp/clean/bin/lib --library /tmp/lib list
+          /tmp/clean/bin/librarian-cli --help

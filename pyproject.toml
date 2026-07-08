@@ -1,0 +1,55 @@
+[project]
+name = "librarian-cli"
+version = "0.1.0"
+description = "Deterministic book-to-markdown pipeline for LLM consumption"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Temirlan Jumabayev"}]
+requires-python = ">=3.11"
+keywords = ["mcp", "rag", "ebook", "epub", "fb2", "markdown", "llm", "claude"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Text Processing",
+]
+dependencies = [
+    "pymupdf>=1.24", "ebooklib>=0.18", "lxml>=5.0", "mammoth>=1.7",
+    "trafilatura>=1.9", "charset-normalizer>=3.3", "tiktoken>=0.7",
+    "typer>=0.12", "rich>=13", "snowballstemmer>=3", "mcp>=1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Terobyte/librarian-cli"
+Repository = "https://github.com/Terobyte/librarian-cli"
+Issues = "https://github.com/Terobyte/librarian-cli/issues"
+Changelog = "https://github.com/Terobyte/librarian-cli/blob/main/CHANGELOG.md"
+
+[project.scripts]
+lib = "librarian.cli:app"
+librarian-cli = "librarian.cli:serve_entry"
+
+[project.optional-dependencies]
+serve = []
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-socket>=0.7", "mcp>=1.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/librarian"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["examples/", "docs/", ".github/", "tests/", "CLAUDE.md", "librarian-spec-v2.2.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--disable-socket --allow-unix-socket"
+markers = ["perf: перф-смоук (мягкий порог, §17)"]

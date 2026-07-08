@@ -205,4 +205,12 @@ def test_serve_missing_extra_prints_hint_and_exits_1(tmp_path, monkeypatch):
     from librarian.cli import app
     r = CliRunner().invoke(app, ["--library", str(tmp_path), "serve"])
     assert r.exit_code == 1
-    assert "librarian[serve]" in r.stderr
+    assert "переустановите librarian-cli" in r.stderr
+
+
+def test_serve_entry_help_exits_0(monkeypatch):
+    from librarian import cli
+    monkeypatch.setattr(sys, "argv", ["librarian-cli", "--help"])
+    with pytest.raises(SystemExit) as exc:
+        cli.serve_entry()
+    assert exc.value.code == 0

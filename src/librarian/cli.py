@@ -168,7 +168,7 @@ def serve(library: Path | None = typer.Option(None, "--library",
     try:
         from librarian.serve import serve as run_serve
     except ImportError:
-        _err.print("установите librarian\\[serve]")
+        _err.print("пакет mcp отсутствует — переустановите librarian-cli")
         raise typer.Exit(1)
     lib = library if library is not None else _lib_root()
     try:
@@ -268,3 +268,10 @@ def _read_report(lib: Path, book_id: str) -> dict:
     import json
     p = lib / book_id / "report.json"
     return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
+
+
+def serve_entry() -> None:
+    """Entry console-script `librarian-cli` (MCP-реестр не умеет extras/подкоманды —
+    отклонение 37): argv → `serve`."""
+    sys.argv = [sys.argv[0], "serve", *sys.argv[1:]]
+    app()

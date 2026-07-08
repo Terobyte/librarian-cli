@@ -1,5 +1,7 @@
 # librarian
 
+English version: [README.md](README.md) (канон, его видит PyPI).
+
 Детерминированный конвейер «книга → Markdown-главы» для работы с LLM.
 Любой входной формат (FB2, EPUB, DOCX, HTML, TXT/MD, PDF с текстовым слоем) →
 каталог чистых глав с подсчитанными токенами. Без сети, без LLM, без случайности:
@@ -7,10 +9,10 @@
 
 ## Установка
 
-    pipx install ./librarian-*.whl     # или: uv tool install .
+    uv tool install librarian-cli     # или: pipx install librarian-cli
 
-Офлайн-контракт: рантайм и установка из локального wheel не требуют сети
-(словарь токенизатора вендорен в пакет).
+Офлайн-контракт: установка и рантайм не требуют сети (словарь токенизатора
+вендорен в пакет).
 
 ## Быстрый старт
 
@@ -35,7 +37,7 @@
 | `lib doctor [<book-id>]` | Без id — книги в review и битые каталоги; с id — отчёт по книге. |
 | `lib reingest --all [--config cfg.toml] [--verbose]` | Пересобрать библиотеку из `source/` текущим кодом/конфигом. |
 | `lib rm <book-id>` | Удалить книгу и пересобрать индекс. |
-| `lib serve [--library <путь>]` | MCP-сервер (stdio) поверх библиотеки; требует `librarian[serve]`. |
+| `lib serve [--library <путь>]` | MCP-сервер (stdio) поверх библиотеки. |
 
 Корень библиотеки: `--library <путь>` (или переменная `LIB_HOME`, по умолчанию `./library`).
 Данные идут в stdout, диагностика — в stderr. Коды выхода: `0` — успех, `1` — ошибка
@@ -58,17 +60,22 @@
 
 `lib serve` поднимает stdio-MCP-сервер (5 read-only тулов: `list_books`, `list_chapters`,
 `find`, `get_chapters`, `book_info`) — Claude сам листает каталог, ищет и вытаскивает главы
-под токен-бюджет: детерминированный RAG без эмбеддингов, без сети, без API-ключей. Нужен
-опциональный extra `librarian[serve]` (тянет `mcp`; ядро остаётся лёгким):
+под токен-бюджет: детерминированный RAG без эмбеддингов, без сети, без API-ключей. `mcp` —
+основная зависимость пакета (отклонение 37: реестр MCP не умеет extras, регистрирует
+голый `uvx librarian-cli`), так что `serve` работает сразу после установки; extra
+`librarian-cli[serve]` оставлен пустым как совместимый шим для старых команд.
 
-    uv sync --extra serve
+Из установленного пакета (реестровый вход — отдельный консольный скрипт):
 
-Подключение к Claude Code (`--extra serve` ставит `mcp` при первом запуске):
+    claude mcp add librarian --env LIB_HOME=/путь/к/library -- uvx librarian-cli
 
-    claude mcp add librarian -- uv run --directory /путь/к/librarian --extra serve lib serve --library /путь/к/library
+В деве (из исходников репозитория):
 
-Claude Desktop — тот же stdio-запуск в JSON-конфиге. Без установленного extra команда
-завершится с подсказкой «установите librarian[serve]».
+    claude mcp add librarian -- uv run --directory /путь/к/repo lib serve --library /путь/к/library
+
+Claude Desktop — тот же stdio-запуск в JSON-конфиге (см. `README.md`). Если пакет `mcp`
+всё же отсутствует (битая установка), команда завершится подсказкой «пакет mcp отсутствует
+— переустановите librarian-cli».
 
 ## Качество
 
