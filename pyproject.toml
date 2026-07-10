@@ -1,6 +1,6 @@
 [project]
 name = "librarian-cli"
-version = "0.1.1"
+version = "0.2.0"
 description = "Deterministic book-to-markdown pipeline for LLM consumption"
 readme = "README.md"
 license = "MIT"

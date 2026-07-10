@@ -3,7 +3,7 @@
   "name": "io.github.Terobyte/librarian",
   "title": "Librarian",
   "description": "Deterministic ebook-to-markdown pipeline with MCP tools to browse, search, and read your books.",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "repository": {
     "url": "https://github.com/Terobyte/librarian-cli",
     "source": "github"
@@ -12,7 +12,7 @@
     {
       "registryType": "pypi",
       "identifier": "librarian-cli",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "transport": {
         "type": "stdio"
       },

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0 — 2026-07-10
+
+- `lib verify "quote" [--book ID] [--json] [--limit N]`: catches misquoted book text,
+  deterministically, no LLM. Book mode (`--book`) does a full scan of one book; shelf mode
+  (no `--book`) attributes the quote across the library via FTS5 candidates.
+- Verdicts `exact` / `close` / `distorted` / `not_found` / `null`, a word-level diff against
+  the source for `close`/`distorted`, and grep-style exit codes with a script discriminator
+  (exit 1 with empty stdout = error; exit 1 with output = "checked, not confirmed").
+- 6th MCP tool, `verify_quote` — runs in a worker thread so a full book scan doesn't block
+  the stdio server; all 6 tool descriptions are now in English (previously Russian).
+
 ## 0.1.1 — 2026-07-08
 
 - Fix the `mcp-name` ownership marker case (`io.github.Terobyte/librarian`) so the MCP
