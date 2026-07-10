@@ -212,6 +212,27 @@ def _run_query(conn: sqlite3.Connection, match: str, *, limit: int,
     return hits[:limit]
 
 
+def chapter_candidates(lib_root: Path, words: list[str], *, k: int = 20
+                        ) -> list[tuple[str, int]]:
+    """Кандидатные главы для verify shelf-режима (§3.4): OR-match по `words`, топ-k
+    (book_id, n) по bm25, без сниппетов/highlight — search() не подходит: подмешивает
+    книжные хиты с n=None и платит за snippet. Тот же паттерн синка/транзакции."""
+    sync(lib_root)
+    conn = _connect(lib_root)
+    try:
+        _begin(conn, immediate=False)
+        try:
+            rows = conn.execute(
+                "SELECT book_id, n FROM chapters WHERE chapters MATCH ? "
+                "ORDER BY bm25(chapters, 0, 0, 5.0, 1.0), book_id, n LIMIT ?",
+                (_build_match(words, "OR"), k)).fetchall()
+        finally:
+            conn.commit()
+    finally:
+        conn.close()
+    return [(bid, n) for bid, n in rows]
+
+
 def search(lib_root: Path, query: str, *, limit: int = 10, book_id: str | None = None,
            reindex: bool = False) -> dict:
     """Синхронизирует индекс, затем ищет. Хит: {book_id, book_title, author, n,

@@ -81,6 +81,16 @@ def info_projection(lib_root: Path, book_id: str) -> dict:
             "hard_triggers": report.get("hard_triggers", [])}
 
 
+def chapter_text(lib_root: Path, book_id: str, file: str) -> str:
+    """Читает текст одной главы; traversal-чек как search._chapter_path (§6 спеки:
+    хелпер общий для get_chapters_core и verify, третья копия проверки не заводится)."""
+    book_dir = (lib_root / book_id).resolve()
+    ch_path = (lib_root / book_id / file).resolve()
+    if not ch_path.is_relative_to(book_dir):
+        raise LibError(f"недопустимый путь главы: {file}")
+    return ch_path.read_text(encoding="utf-8")
+
+
 def get_chapters_core(lib_root: Path, book_id: str, *, spec: str | None = None,
                        budget: int | None = None, from_: int = 1) -> dict:
     """Выбор глав по spec/budget — общее ядро `lib get` и MCP get_chapters.
@@ -116,13 +126,7 @@ def get_chapters_core(lib_root: Path, book_id: str, *, spec: str | None = None,
             next_from = first_skipped
             message = f"не вошли в бюджет: главы {first_skipped}–{chaps[-1]['n']}"
     by_n = {ch["n"]: ch for ch in chaps}
-    book_dir = (lib_root / book_id).resolve()
-    texts: list[str] = []
-    for n in nums:
-        ch_path = (lib_root / book_id / by_n[n]["file"]).resolve()
-        if not ch_path.is_relative_to(book_dir):
-            raise LibError(f"недопустимый путь главы: {by_n[n]['file']}")
-        texts.append(ch_path.read_text(encoding="utf-8"))
+    texts = [chapter_text(lib_root, book_id, by_n[n]["file"]) for n in nums]
     text = "\n\n".join(t.rstrip("\n") for t in texts) + "\n"
     return {"text": text, "chapters": nums, "next_from": next_from, "message": message}
 

@@ -1,3 +1,9 @@
+import shutil
+from pathlib import Path
+
+import pytest
+
+from conftest import _mkbook
 from librarian.verify import (
     CLOSE,
     DISTORTED,
@@ -9,8 +15,12 @@ from librarian.verify import (
     round_similarity,
     significant_tokens,
     verdict_for,
+    verify_quote,
     word_diff,
 )
+
+SKAZKA_LIB = Path(__file__).parent.parent / "golden" / "skazka"
+SKAZKA_ID = "ivan-hvostov-skazka-o-kite"
 
 
 # --- нормализация: типографика/пунктуация не в счёт ------------------------
@@ -263,3 +273,184 @@ def test_passage_is_verbatim_slice_of_original():
     idx = norm.tokens.index("горят")
     p = passage(text, norm, idx, idx + 1)
     assert p in text                    # вербатим-срез оригинала, не канон
+
+
+# --- 9b (амендмент T2): passage не начинается/заканчивается пробелом --------
+
+def test_passage_does_not_start_or_end_with_whitespace():
+    text = ("Para one.\n\n# Heading\n\n"
+            "First sentence stays out. Second sentence has the match word here. "
+            "Third sentence stays out too.")
+    norm = normalize(text)
+    idx = norm.tokens.index("match")
+    p = passage(text, norm, idx, idx + 1)
+    assert p == p.strip()
+    assert not p[0].isspace()
+    assert not p[-1].isspace()
+
+
+def test_passage_after_blank_line_in_segment_does_not_start_with_newline():
+    # первая строка сегмента после выброшенного заголовка — пустая (сегмент её не
+    # рвёт); без 9b-фикса start указывал бы прямо на этот "\n".
+    text = "# Heading\n\nBody text has the match word right here."
+    norm = normalize(text)
+    idx = norm.tokens.index("match")
+    p = passage(text, norm, idx, idx + 1)
+    assert not p[0].isspace()
+
+
+# --- verify_quote: режим книги + режим полки (T2, §7) ------------------------
+
+# длинный абзац (>150 символов, README-оговорка §3.3: close на замене слова
+# достижим от ~150 символов) — синтетическая книга, golden-тексты вырожденные.
+_PARA = ("Рукописи не горят, сказал мастер тихо, и это была не метафора, а истина, "
+        "выстраданная годами скитаний по чужим квартирам и больничным палатам, "
+        "среди людей, которые никогда не поймут, что значит терять роман, "
+        "переписанный от руки трижды.")
+
+
+def _mklib_master(tmp_path):
+    lib = tmp_path / "library"
+    _mkbook(lib, "master", "Мастер и Маргарита", "Михаил Булгаков",
+            [("Глава 24", _PARA)])
+    return lib
+
+
+def test_verify_quote_exact_book_mode(tmp_path):
+    lib = _mklib_master(tmp_path)
+    res = verify_quote(lib, _PARA, book_id="master")
+    assert res["verdict"] == "exact"
+    assert res["matches"][0]["similarity"] == 1.0
+    assert res["matches"][0]["diff"] == []
+    assert res["message"] is None
+
+
+def test_verify_quote_close_single_word_diff_book_mode(tmp_path):
+    lib = _mklib_master(tmp_path)
+    quote = _PARA.replace("истина,", "правда,")
+    res = verify_quote(lib, quote, book_id="master")
+    assert res["verdict"] == "close"
+    m = res["matches"][0]
+    assert CLOSE <= m["similarity"] < 1.0
+    assert m["diff"] == [{"quoted": "правда", "source": "истина"}]
+
+
+def test_verify_quote_distorted_clause_omission_book_mode(tmp_path):
+    lib = _mklib_master(tmp_path)
+    quote = _PARA.replace("среди людей, которые никогда не поймут, ", "")
+    res = verify_quote(lib, quote, book_id="master")
+    assert res["verdict"] == "distorted"
+    assert DISTORTED <= res["matches"][0]["similarity"] < CLOSE
+
+
+def test_verify_quote_not_found_foreign_text_book_mode(tmp_path):
+    lib = _mklib_master(tmp_path)
+    res = verify_quote(lib, "Совсем другой текст про космос и звёзды, "
+                            "не имеющий отношения к делу вовсе.", book_id="master")
+    assert res["verdict"] == "not_found"
+    assert res["matches"] == []
+    assert res["message"]
+
+
+def test_verify_quote_shelf_mode_exact_finds_book(tmp_path):
+    lib = _mklib_master(tmp_path)
+    _mkbook(lib, "other", "Другая книга", "Другой автор",
+            [("Гл1", "Совсем другой текст ни о чём не связанный с рукописями вовсе.")])
+    res = verify_quote(lib, _PARA)                    # без --book
+    assert res["verdict"] == "exact"
+    assert res["matches"][0]["book_id"] == "master"
+
+
+def test_verify_quote_shelf_mode_close_finds_book(tmp_path):
+    lib = _mklib_master(tmp_path)
+    quote = _PARA.replace("истина,", "правда,")
+    res = verify_quote(lib, quote)
+    assert res["verdict"] == "close"
+    assert res["matches"][0]["book_id"] == "master"
+
+
+def test_verify_quote_empty_quote_is_null():
+    # пустая цитата отсекается ДО любого обращения к lib_root (§5) — путь может
+    # не существовать вовсе.
+    res = verify_quote(Path("/nonexistent"), "   ")
+    assert res["verdict"] is None
+    assert res["matches"] == []
+    assert res["message"]
+
+
+def test_verify_quote_short_quote_without_book_is_null(tmp_path):
+    lib = _mklib_master(tmp_path)
+    res = verify_quote(lib, "рукописи не горят")          # 3 значимых токена < 5
+    assert res["verdict"] is None
+    assert res["matches"] == []
+    assert "--book" in res["message"]
+
+
+def test_verify_quote_limit_below_one_raises(tmp_path):
+    lib = _mklib_master(tmp_path)
+    with pytest.raises(ValueError):
+        verify_quote(lib, _PARA, book_id="master", limit=0)
+
+
+def test_verify_quote_empty_library_shelf_not_found(tmp_path):
+    lib = tmp_path / "library"
+    res = verify_quote(lib, "совершенно случайная цитата из ниоткуда вообще")
+    assert res["verdict"] == "not_found"
+    assert res["matches"] == []
+
+
+def test_verify_quote_determinism_two_calls_identical_dict(tmp_path):
+    lib = _mklib_master(tmp_path)
+    r1 = verify_quote(lib, _PARA, book_id="master")
+    r2 = verify_quote(lib, _PARA, book_id="master")
+    assert r1 == r2
+
+
+def test_verify_quote_longer_than_chapter_matches_whole_chapter(tmp_path):
+    lib = tmp_path / "library"
+    chapter = "Кит нырнул в холодное море и уплыл на юг."
+    _mkbook(lib, "short", "Короткая книга", "Автор", [("Гл1", chapter)])
+    res = verify_quote(lib, chapter + " И там.", book_id="short")
+    assert res["verdict"] == "distorted"
+    assert res["matches"][0]["passage"] == chapter    # окно = вся глава
+
+
+# --- verify_quote на golden skazka: книжный режим IN-PLACE (read-only) -------
+
+def test_verify_quote_skazka_refrain_single_match_book_mode():
+    refrain = ("Кит шёл на юг, раздвигая тяжёлую воду, и берег медленно таял "
+              "за кормой рыбацких лодок.")
+    res = verify_quote(SKAZKA_LIB, refrain, book_id=SKAZKA_ID)
+    assert res["verdict"] == "exact"
+    assert len(res["matches"]) == 1                   # рефрен ~12 раз — одна запись
+    assert res["matches"][0]["n"] == 1
+    assert not (SKAZKA_LIB / ".search.db").exists()    # read-only book-режим
+
+
+def test_verify_quote_skazka_epigraph_found_book_mode():
+    res = verify_quote(SKAZKA_LIB, "Море зовёт всякого.", book_id=SKAZKA_ID)
+    assert res["verdict"] == "exact"
+    assert not (SKAZKA_LIB / ".search.db").exists()
+
+
+# --- shelf-режим на skazka: ТОЛЬКО на tmp_path-копии (sync пишет .search.db) --
+
+@pytest.fixture
+def skazka_copy(tmp_path):
+    lib = tmp_path / "library"
+    shutil.copytree(SKAZKA_LIB, lib)
+    for name in (".search.db", ".lock"):                # золото не должно их нести
+        p = lib / name
+        if p.exists():
+            p.unlink()
+    return lib
+
+
+def test_verify_quote_shelf_mode_yo_variant_finds_match(skazka_copy):
+    # книга хранит «шёл», цитата — «шел» (е вместо ё); FTS5 unicode61 их не
+    # сворачивает (MAJOR-1/отклонение 39) — verify обязан найти всё равно.
+    quote = "кит шел на юг раздвигая тяжелую воду"
+    res = verify_quote(skazka_copy, quote)
+    assert res["verdict"] == "exact"
+    assert res["matches"][0]["book_id"] == SKAZKA_ID
+    assert (skazka_copy / ".search.db").exists()

@@ -10,6 +10,10 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from difflib import SequenceMatcher
+from pathlib import Path
+
+from librarian.catalog import chapter_text, read_book
+from librarian.search import chapter_candidates
 
 # --- пороги (§3.3) ----------------------------------------------------------
 
@@ -358,6 +362,11 @@ def passage(text: str, norm: Norm, lo: int, hi: int, *, limit: int = 400) -> str
     start = seg_start
     for m in _SENT_BOUNDARY.finditer(text, seg_start, span_start):
         start = m.end()
+    # 9b (амендмент T2): _SENT_BOUNDARY — лукахед `(?=\s)`, не поглощает пробел;
+    # start иначе указывает НА пробел ("\n\n"/" "), passage начинался бы с него.
+    # Прогон пробельных ограничен span_start — он всегда символ слова (не пробел).
+    while start < span_start and text[start].isspace():
+        start += 1
 
     stop = seg_end
     m = _SENT_BOUNDARY.search(text, span_end, seg_end)
@@ -382,3 +391,116 @@ def passage(text: str, norm: Norm, lo: int, hi: int, *, limit: int = 400) -> str
     if right_cut:
         out = out.rstrip() + " […]"
     return out
+
+
+# --- verify_quote: режим книги + режим полки (§3, §4.1, T2) ------------------
+
+_EMPTY_QUOTE_MSG = "пустая цитата (или пустая после нормализации) — нечего проверять"
+_SHORT_QUOTE_MSG = ("слишком короткая цитата для поиска по библиотеке — "
+                    "укажи книгу через --book")
+_NOT_FOUND_MSG = "цитата не найдена — совпадений выше порога нет"
+_NOT_FOUND_SHELF_HINT = (" FTS5-кандидаты могли не покрыть сильно искажённую "
+                         "цитату — попробуй --book.")
+
+
+def _yo_variants(word: str) -> list[str]:
+    """MAJOR-1/Plan v2 (отклонение 39): FTS5 unicode61 remove_diacritics не сворачивает
+    ё→е для кириллицы, а канон-токен уже ё-сложен — без расширения shelf-поиск
+    промахивается мимо дословной цитаты с е/ё-разницей. Варианты: сам токен, затем
+    подстановка е→ё в каждой позиции слева направо, кап 8 вариантов/слово всего.
+    chapter_candidates остаётся спека-чистым OR-match; расширение — забота verify."""
+    variants = [word]
+    for i, ch in enumerate(word):
+        if len(variants) >= 8:
+            break
+        if ch == "е":
+            variants.append(word[:i] + "ё" + word[i + 1:])
+    return variants
+
+
+def _null(message: str) -> dict:
+    return {"verdict": None, "matches": [], "message": message}
+
+
+def _match_entry(book: dict, book_id: str, ch: dict, text: str, norm: Norm,
+                 window: Window, quote: str, quote_norm: Norm) -> tuple[float, bool, dict]:
+    """similarity, exact, match-dict (§4.1, ключи и порядок — как в спеке) для окна
+    попадания в одной главе."""
+    similarity = round_similarity(window.ratio)
+    diff = word_diff(text, norm.spans[window.lo:window.hi], norm.tokens[window.lo:window.hi],
+                     quote, quote_norm.spans, quote_norm.tokens)
+    entry = {
+        "book_id": book_id,
+        "book_title": book.get("title"),
+        "author": book.get("author"),
+        "n": ch["n"],
+        "chapter_title": ch.get("title"),
+        "similarity": similarity,
+        "passage": passage(text, norm, window.lo, window.hi),
+        "diff": diff,
+    }
+    return similarity, window.exact, entry
+
+
+def _below_distorted(window: Window | None) -> bool:
+    return window is None or (not window.exact and round_similarity(window.ratio) < DISTORTED)
+
+
+def verify_quote(lib_root: Path, quote: str, *, book_id: str | None = None,
+                 limit: int = 3) -> dict:
+    """§3, §4.1: вердикт + локация + word-diff цитаты против library/. book_id задан —
+    режим книги (полный скан, главы по n); иначе — режим полки (FTS5-кандидаты,
+    chapter_candidates, топ-20). Ядро ВСЕГДА возвращает структуру: исключения —
+    только LibError (неизвестный book_id, нет FTS5, занят индекс) и ValueError (limit<1)."""
+    if limit < 1:
+        raise ValueError(f"limit должен быть >= 1, получено {limit}")
+
+    quote_norm = normalize(quote)
+    if not quote_norm.tokens:
+        return _null(_EMPTY_QUOTE_MSG)
+
+    book_cache: dict[str, dict] = {}
+
+    def get_book(bid: str) -> dict:
+        if bid not in book_cache:
+            book_cache[bid] = read_book(lib_root, bid)
+        return book_cache[bid]
+
+    ranked: list[tuple[float, bool, dict]] = []
+
+    if book_id is not None:
+        book = get_book(book_id)
+        for ch in sorted(book.get("chapters", []), key=lambda c: c["n"]):
+            text = chapter_text(lib_root, book_id, ch["file"])
+            norm = normalize(text)
+            window = find_window(norm, quote_norm)
+            if _below_distorted(window):
+                continue
+            ranked.append(_match_entry(book, book_id, ch, text, norm, window,
+                                       quote, quote_norm))
+    else:
+        significant = significant_tokens(quote_norm.tokens)
+        if len(significant) < 5:
+            return _null(_SHORT_QUOTE_MSG)
+        words = [v for tok in significant for v in _yo_variants(tok)]
+        for cbid, cn in chapter_candidates(lib_root, words, k=20):
+            book = get_book(cbid)
+            ch = next((c for c in book.get("chapters", []) if c["n"] == cn), None)
+            if ch is None:
+                continue
+            text = chapter_text(lib_root, cbid, ch["file"])
+            norm = normalize(text)
+            window = find_window(norm, quote_norm)
+            if _below_distorted(window):
+                continue
+            ranked.append(_match_entry(book, cbid, ch, text, norm, window,
+                                       quote, quote_norm))
+
+    ranked.sort(key=lambda c: (-c[0], c[2]["book_id"], c[2]["n"]))
+    matches = [c[2] for c in ranked[:limit]]
+    if not matches:
+        msg = _NOT_FOUND_MSG + (_NOT_FOUND_SHELF_HINT if book_id is None else "")
+        return {"verdict": "not_found", "matches": [], "message": msg}
+
+    verdict = verdict_for(ranked[0][0], ranked[0][1])
+    return {"verdict": verdict, "matches": matches, "message": None}
