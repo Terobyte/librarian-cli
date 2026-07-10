@@ -17,6 +17,8 @@ from librarian.emit import library_lock, recover
 from librarian.errors import LibError
 from librarian.pipeline import run_ingest, run_reingest
 from librarian.search import search as run_search
+from librarian.verify import verdict_for
+from librarian.verify import verify_quote as run_verify
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 _state: dict = {"library": None}
@@ -160,6 +162,64 @@ def find(query: str,
                   h["book_title"] if h["chapter_title"] is None else h["chapter_title"],
                   h["snippet"])
     out.print(t)
+
+
+@app.command()
+def verify(quote: str,
+           book: str = typer.Option(None, "--book", help="id книги: режим проверки "
+                                     "(полный скан); без него — режим полки (FTS5)"),
+           json_out: bool = typer.Option(False, "--json"),
+           limit: int = typer.Option(3, "--limit")) -> None:
+    # отклонение 38: exit-семантика grep (exact/close=0, distorted/not_found=1,
+    # LibError=1 пустой stdout, verdict null/limit<1=2 пустой stdout) — НЕ паттерн
+    # get (там ValueError→1): limit<1 здесь всегда 2.
+    if limit < 1:
+        _err.print(f"limit должен быть >= 1, получено {limit}")
+        raise typer.Exit(2)
+    try:
+        res = run_verify(_lib_root(), quote, book_id=book, limit=limit)
+    except LibError as e:
+        _err.print(str(e))
+        raise typer.Exit(1)
+    except ValueError as e:
+        _err.print(str(e))
+        raise typer.Exit(2)
+
+    verdict = res["verdict"]
+    if verdict is None:
+        _err.print(res["message"])
+        raise typer.Exit(2)
+
+    if json_out:
+        import json
+        sys.stdout.write(json.dumps(res, ensure_ascii=False) + "\n")
+    elif verdict == "not_found":
+        sys.stdout.write("not_found\n")
+        sys.stdout.write(res["message"] + "\n")
+    else:
+        _print_verify_report(res)
+
+    raise typer.Exit(0 if verdict in ("exact", "close") else 1)
+
+
+def _print_verify_report(res: dict) -> None:
+    """Человеческий отчёт (§4.2): на каждый match — строка вердикта (пересчитан
+    из similarity+diff — диагностика per-match, а не общий verdict ответа),
+    пассаж (пробельные прогоны схлопнуты в один пробел при печати) и word-diff
+    построчно, выровненный под «цитировано:»/«в книге:»."""
+    import re
+    for i, m in enumerate(res["matches"]):
+        if i:
+            sys.stdout.write("\n")
+        m_verdict = verdict_for(m["similarity"], not m["diff"])
+        passage_text = re.sub(r"\s+", " ", m["passage"])
+        sys.stdout.write(
+            f'{m_verdict} {m["similarity"]:.4f} — {m["book_id"]}, глава {m["n"]} '
+            f'«{m["chapter_title"]}»\n')
+        sys.stdout.write(f'  «{passage_text}»\n')
+        for d in m["diff"]:
+            sys.stdout.write(f'  - цитировано: {d["quoted"]}\n')
+            sys.stdout.write(f'  + в книге:    {d["source"]}\n')
 
 
 @app.command()

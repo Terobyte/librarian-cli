@@ -140,6 +140,33 @@ def test_book_info_bad_book_id_raises(tmp_path, bad_id):
         serve.book_info(lib, bad_id)
 
 
+# --- verify_quote adapter: plain-функция, ноль своей логики, T3 item 11 -------
+
+def test_verify_quote_adapter_roundtrip(tmp_path):
+    lib = tmp_path / "library"
+    _mkbook(lib, "kit", "Сказка о ките", "Иван Хвостов",
+            [("Глава 1", "Кит шёл на юг, раздвигая тяжёлую воду.")])
+    res = serve.verify_quote(lib, "Кит шёл на юг, раздвигая тяжёлую воду.",
+                              book_id="kit")
+    assert res["verdict"] == "exact"
+    assert res["matches"][0]["book_id"] == "kit"
+
+
+@pytest.mark.parametrize("bad_id", ["не-существующая-книга", "../x"])
+def test_verify_quote_adapter_bad_book_id_raises(tmp_path, bad_id):
+    lib = tmp_path / "library"
+    lib.mkdir()
+    with pytest.raises(LibError):
+        serve.verify_quote(lib, "любая цитата", book_id=bad_id)
+
+
+def test_verify_quote_adapter_limit_below_one_raises(tmp_path):
+    lib = tmp_path / "library"
+    _mkbook(lib, "kit", "Сказка о ките", "Иван Хвостов", [("Глава 1", "текст главы")])
+    with pytest.raises(ValueError):
+        serve.verify_quote(lib, "текст главы", book_id="kit", limit=0)
+
+
 # --- e2e smoke: real subprocess + MCP stdio handshake -------------------------
 
 # на Windows asyncio поднимает внутренний socketpair — pytest-socket его блокирует
@@ -159,11 +186,16 @@ async def test_e2e_subprocess_handshake_and_list_books(tmp_path):
         args=["-m", "librarian", "serve", "--library", str(lib)],
         env=dict(os.environ),
     )
-    with anyio.fail_after(30):
+    with anyio.fail_after(60):
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
                 init_result = await session.initialize()
                 assert init_result.serverInfo.name == "librarian"
+
+                tools_result = await session.list_tools()
+                assert {t.name for t in tools_result.tools} == {
+                    "list_books", "list_chapters", "find", "get_chapters",
+                    "book_info", "verify_quote"}
 
                 result = await session.call_tool("list_books", {})
                 assert not result.isError
@@ -171,6 +203,14 @@ async def test_e2e_subprocess_handshake_and_list_books(tmp_path):
                 if books is None:
                     books = [json.loads(c.text) for c in result.content]
                 assert any(b["id"] == "kit" for b in books)
+
+                verify_result = await session.call_tool(
+                    "verify_quote", {"quote": "текст главы", "book_id": "kit"})
+                assert not verify_result.isError
+                verify_payload = (verify_result.structuredContent or {}).get("result")
+                if verify_payload is None:
+                    verify_payload = json.loads(verify_result.content[0].text)
+                assert "verdict" in verify_payload
 
 
 # --- missing extra: lazy import of mcp fails cleanly with RU hint ------------

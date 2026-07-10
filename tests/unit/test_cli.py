@@ -398,3 +398,80 @@ def test_find_or_fallback_partial_true_in_json(tmp_path, monkeypatch):
     assert r.stderr == ""
     payload = json.loads(r.stdout)
     assert payload["partial"] is True
+
+
+# --- verify: exit-семантика grep (отклонение 38), T3 items 10/12 --------------
+
+_VERIFY_PARA = (
+    "Рукописи не горят, сказал мастер тихо, и это была не метафора, а истина, "
+    "выстраданная годами скитаний по чужим квартирам и больничным палатам, "
+    "среди людей, которые никогда не поймут, что значит терять роман, "
+    "переписанный от руки трижды.")
+
+
+def _mklib_verify(tmp_path):
+    from conftest import _mkbook
+    lib_dir = tmp_path / "library"
+    _mkbook(lib_dir, "master", "Мастер и Маргарита", "Михаил Булгаков",
+            [("Глава 24", _VERIFY_PARA)])
+    return lib_dir, "master"
+
+
+def test_verify_exact_exit_0_report_on_stdout(tmp_path):
+    lib_dir, bid = _mklib_verify(tmp_path)
+    r = runner.invoke(app, ["--library", str(lib_dir), "verify", _VERIFY_PARA,
+                            "--book", bid])
+    assert r.exit_code == 0
+    assert "exact" in r.stdout
+    assert bid in r.stdout
+
+
+def test_verify_not_found_exit_1_nonempty_stdout_with_verdict(tmp_path):
+    lib_dir, bid = _mklib_verify(tmp_path)
+    r = runner.invoke(app, ["--library", str(lib_dir), "verify",
+                            "Совсем другой текст про космос и звёзды, "
+                            "не имеющий отношения к делу вовсе.", "--book", bid])
+    assert r.exit_code == 1
+    assert r.stdout.strip() != ""
+    assert "not_found" in r.stdout
+
+
+def test_verify_unknown_book_exit_1_empty_stdout(tmp_path):
+    lib_dir, _ = _mklib_verify(tmp_path)
+    r = runner.invoke(app, ["--library", str(lib_dir), "verify", _VERIFY_PARA,
+                            "--book", "нет-такой"])
+    assert r.exit_code == 1
+    assert r.stdout == ""
+
+
+def test_verify_empty_quote_exit_2_empty_stdout(tmp_path):
+    lib_dir, _ = _mklib_verify(tmp_path)
+    r = runner.invoke(app, ["--library", str(lib_dir), "verify", "   "])
+    assert r.exit_code == 2
+    assert r.stdout == ""
+
+
+def test_verify_short_quote_without_book_exit_2_empty_stdout(tmp_path):
+    lib_dir, _ = _mklib_verify(tmp_path)
+    r = runner.invoke(app, ["--library", str(lib_dir), "verify", "рукописи не горят"])
+    assert r.exit_code == 2
+    assert r.stdout == ""
+
+
+def test_verify_limit_zero_exit_2_empty_stdout(tmp_path):
+    lib_dir, bid = _mklib_verify(tmp_path)
+    r = runner.invoke(app, ["--library", str(lib_dir), "verify", _VERIFY_PARA,
+                            "--book", bid, "--limit", "0"])
+    assert r.exit_code == 2
+    assert r.stdout == ""
+
+
+def test_verify_json_byte_for_byte_identical(tmp_path):
+    lib_dir, bid = _mklib_verify(tmp_path)
+    args = ["--library", str(lib_dir), "verify", _VERIFY_PARA, "--book", bid, "--json"]
+    r1 = runner.invoke(app, args)
+    r2 = runner.invoke(app, args)
+    assert r1.exit_code == 0 and r2.exit_code == 0
+    assert r1.stdout == r2.stdout
+    payload = json.loads(r1.stdout)
+    assert payload["verdict"] == "exact"
