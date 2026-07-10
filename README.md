@@ -7,8 +7,9 @@
 [![License](https://img.shields.io/pypi/l/librarian-cli)](LICENSE)
 [![MCP registry](https://img.shields.io/badge/MCP_registry-io.github.Terobyte%2Flibrarian-6A5ACD)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.Terobyte/librarian)
 
-Turn any ebook into clean, token-counted Markdown chapters — and let Claude read your
-bookshelf over MCP. Deterministic RAG: no embeddings, no network, no API keys.
+Turn any ebook into clean, token-counted Markdown chapters — let Claude read your
+bookshelf over MCP and catch it misquoting your books. Deterministic RAG: no embeddings,
+no network, no API keys.
 
 ![demo](docs/assets/demo.gif)
 
